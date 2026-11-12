@@ -464,7 +464,9 @@ public final class ModSettingsActivity extends Activity {
             new Setting(Category.FEED, S.GROUP_FILTERS, S.HIDE_SEEN, S.HIDE_SEEN_DESC, Prefs.HIDE_SEEN),
             new Setting(Category.FEED, S.GROUP_FILTERS, S.CUSTOM_FILTER, S.CUSTOM_FILTER_DESC, Prefs.CUSTOM_FILTER),
             new Setting(Category.PLAYBACK, S.GROUP_PLAYBACK, S.AUTO_SCROLL, S.AUTO_SCROLL_DESC, Prefs.AUTO_SCROLL),
+            new Setting(Category.PLAYBACK, S.GROUP_PLAYBACK, S.SKIP_PHOTOS, S.SKIP_PHOTOS_DESC, Prefs.SKIP_PHOTOS),
             new Setting(Category.PLAYBACK, S.GROUP_PLAYBACK, S.BACKGROUND_PLAY, S.BACKGROUND_PLAY_DESC, Prefs.BACKGROUND_PLAY),
+            new Setting(Category.PLAYBACK, S.GROUP_PLAYBACK, S.MEDIA_CONTROLS, S.MEDIA_CONTROLS_DESC, Prefs.MEDIA_CONTROLS),
             new Setting(Category.PLAYBACK, S.GROUP_PLAYBACK, S.NO_DOUBLE_TAP_LIKE, S.NO_DOUBLE_TAP_LIKE_DESC, Prefs.NO_DOUBLE_TAP_LIKE),
             new Setting(Category.PLAYBACK, S.GROUP_PLAYBACK, S.REMEMBER_SPEED, S.REMEMBER_SPEED_DESC, Prefs.REMEMBER_SPEED),
             new Setting(Category.PLAYBACK, S.GROUP_PLAYBACK, S.RESUME_POSITION, S.RESUME_POSITION_DESC, Prefs.RESUME_POSITION),
@@ -2755,7 +2757,7 @@ public final class ModSettingsActivity extends Activity {
             Prefs.UNMUTE, Prefs.SELF_REPOST, Prefs.HD_UPLOAD, Prefs.GHOST_ONLINE, Prefs.GHOST_READ,
             Prefs.COMMENT_PHOTOS, Prefs.NO_HASHTAG_LIMIT, Prefs.CAMERA_EXTRAS, Prefs.HIDE_ROOT, Prefs.PIP_FEED,
             Prefs.PREFER_H264, Prefs.PHOTO_BEST, Prefs.NO_MOTION_SENSORS, Prefs.NO_TIKTOK_ANALYTICS, Prefs.UPLOAD_ORIGINAL,
-            Prefs.FEED_REGION_OWN, Prefs.KEEP_UNSENT, Prefs.NO_DOUBLE_TAP_LIKE, Prefs.ACCOUNT_DATE, Prefs.LIVE_RECORD, Prefs.COMMENT_NO_LIMIT, Prefs.CLASSIC_EMOJI, Prefs.OFFLINE_MORE, Prefs.BACKGROUND_PLAY};
+            Prefs.FEED_REGION_OWN, Prefs.KEEP_UNSENT, Prefs.NO_DOUBLE_TAP_LIKE, Prefs.ACCOUNT_DATE, Prefs.LIVE_RECORD, Prefs.COMMENT_NO_LIMIT, Prefs.CLASSIC_EMOJI, Prefs.OFFLINE_MORE, Prefs.BACKGROUND_PLAY, Prefs.MEDIA_CONTROLS, Prefs.SKIP_PHOTOS};
 
     /**
      * A small mark after a row's title: an outlined "Beta" for settings under test, a plain

@@ -49,6 +49,11 @@ final class BackgroundPlay {
     private static volatile boolean playingAtPause = true;
     private static volatile long pausedAt;
     private static Method playerAbility;
+    private static Method currentAweme;
+    /** Paused from the notification, the lock screen or a headset: TikTok's pauses go through and nothing restarts. */
+    private static volatile boolean userPaused;
+    /** The video the notification shows. */
+    private static String shownId;
     private static WeakReference<Object> panel = new WeakReference<>(null);
     /** The engine that plays the current video. */
     private static WeakReference<Object> engine = new WeakReference<>(null);
@@ -76,6 +81,8 @@ final class BackgroundPlay {
         int hooks = 0;
         Class<?> panelType = Hooks.findClass(PANEL, loader);
         if (panelType != null) {
+            currentAweme = RenderedAdSkip.currentAweme(panelType);
+            if (currentAweme != null) currentAweme.setAccessible(true);
             for (Method method : Reflect.methods(panelType)) {
                 if (method.getParameterTypes().length == 0 && ABILITY.equals(method.getReturnType().getName())) {
                     method.setAccessible(true);
@@ -125,6 +132,15 @@ final class BackgroundPlay {
             lock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TiktokPatchXposed:background");
             lock.setReferenceCounted(false);
         }
+        MediaControls.attach(app, new MediaControls.Player() {
+            @Override public void play() { userPlay(); }
+
+            @Override public void pause() { userPause(); }
+
+            @Override public void next() { userNext(); }
+
+            @Override public void stop() { userStop(); }
+        });
         Foreground.listenAway(BackgroundPlay::putAway);
         Foreground.listen(BackgroundPlay::back);
         watchFocus();
@@ -207,7 +223,7 @@ final class BackgroundPlay {
     }
 
     private static boolean blocking() {
-        return away && SystemClock.uptimeMillis() >= movingUntil && Prefs.on(Prefs.BACKGROUND_PLAY) && !inCall();
+        return away && !userPaused && SystemClock.uptimeMillis() >= movingUntil && Prefs.on(Prefs.BACKGROUND_PLAY) && !inCall();
     }
 
     /** No TikTok screen is shown any more: another app took the screen, or it turned off. */
@@ -229,19 +245,16 @@ final class BackgroundPlay {
 
     private static void start() {
         away = true;
+        userPaused = false;
+        shownId = null;
         lastPosition = -1;
         stalls = 0;
-        if (lock != null) {
-            try {
-                lock.acquire(LOCK_MS);
-            } catch (Throwable error) {
-                Safe.log("background play wake lock", error);
-            }
-        }
+        holdLock();
         MAIN.removeCallbacks(WATCH);
         MAIN.postDelayed(WATCH, WATCH_MS);
-        // A pause can come from the player's own thread; auto-scroll lives on the main one.
+        // A pause can come from the player's own thread; auto-scroll and the notification live on the main one.
         MAIN.post(Safe.run("background auto-scroll", AutoScroll::putAway));
+        MAIN.post(Safe.run("media controls", () -> notifyNow(true)));
         RuntimeLog.log("background play: on");
     }
 
@@ -254,12 +267,99 @@ final class BackgroundPlay {
 
     private static void stop() {
         away = false;
+        userPaused = false;
         MAIN.removeCallbacks(WATCH);
+        releaseLock();
+        MAIN.post(Safe.run("media controls", MediaControls::hide));
+    }
+
+    private static void holdLock() {
+        if (lock == null) return;
+        try {
+            lock.acquire(LOCK_MS);
+        } catch (Throwable error) {
+            Safe.log("background play wake lock", error);
+        }
+    }
+
+    private static void releaseLock() {
         if (lock != null && lock.isHeld()) {
             try {
                 lock.release();
             } catch (Throwable ignored) { }
         }
+    }
+
+    /** The notification follows the current video; {@code force} redraws it even when it has not changed. */
+    private static void notifyNow(boolean force) {
+        if (!away) return;
+        Object feedPanel = panel.get();
+        Object aweme = feedPanel == null ? null : invoke(currentAweme, feedPanel);
+        Object aid = aweme == null ? null : Reflect.get(aweme, "aid");
+        String id = aid == null ? null : String.valueOf(aid);
+        if (!force && (id == null || id.equals(shownId))) return;
+        shownId = id;
+        MediaControls.show(aweme, !userPaused);
+    }
+
+    private static void userPause() {
+        if (!away) return;
+        userPaused = true;
+        pausePlayer();
+        releaseLock();
+        notifyNow(true);
+    }
+
+    private static void userPlay() {
+        if (!away) return;
+        userPaused = false;
+        stalls = 0;
+        lastPosition = -1;
+        holdLock();
+        resume();
+        notifyNow(true);
+    }
+
+    private static void userNext() {
+        if (!away) return;
+        boolean wasPaused = userPaused;
+        userPaused = false;
+        if (wasPaused) holdLock();
+        AutoScroll.skip();
+        MAIN.postDelayed(Safe.run("media controls", () -> notifyNow(true)), 1_600L);
+    }
+
+    /** The stop button: the video pauses and the controls go away, until TikTok is opened again. */
+    private static void userStop() {
+        if (!away) return;
+        userPaused = true;
+        pausePlayer();
+        stop();
+    }
+
+    private static final String[] PAUSE_NAMES = {"pause", "pausePlay", "tryPausePlay", "pauseVideo", "tryPause"};
+
+    private static void pausePlayer() {
+        Object feedPanel = panel.get();
+        if (feedPanel != null && (call(invoke(playerAbility, feedPanel), PAUSE_NAMES)
+                || call(Reflect.call(feedPanel, "getPlayerManager"), PAUSE_NAMES))) return;
+        Object current = engine.get();
+        if (current != null) Reflect.call(current, "pause");
+    }
+
+    private static boolean call(Object player, String[] names) {
+        if (player == null) return false;
+        for (String name : names) {
+            Method method = Reflect.method(player.getClass(), name);
+            if (method == null || method.getReturnType() != void.class) continue;
+            try {
+                method.invoke(player);
+                return true;
+            } catch (Throwable ignored) {
+                // The next name.
+            }
+        }
+        return false;
     }
 
     /** While away: when the video stands still, TikTok paused it some other way; play it again. */
@@ -276,6 +376,11 @@ final class BackgroundPlay {
             if (!away) return;
             if (!Prefs.on(Prefs.BACKGROUND_PLAY) || inCall()) {
                 stop();
+                return;
+            }
+            notifyNow(false);
+            if (userPaused) {
+                MAIN.postDelayed(this, WATCH_MS);
                 return;
             }
             Object feedPanel = panel.get();

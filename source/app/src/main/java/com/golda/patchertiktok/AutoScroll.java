@@ -89,7 +89,8 @@ final class AutoScroll {
                 @Override protected void after(Hooks.Call param) {
                     shown = new WeakReference<>(param.thisObject);
                     // The panel is remembered even when off, so the switch can start right away.
-                    if (!recommended(param.thisObject) || BackgroundPlay.away()) started(param.thisObject);
+                    if (!recommended(param.thisObject) || BackgroundPlay.away()
+                            || nativeForYou && Prefs.on(Prefs.SKIP_PHOTOS)) started(param.thisObject);
                 }
             });
         }
@@ -435,9 +436,18 @@ final class AutoScroll {
             Object seconds = Reflect.call(Reflect.call(aweme, "getMusic"), "getDuration");
             long music = seconds instanceof Number ? ((Number) seconds).longValue() * 1_000L : 0L;
             if (photos > 0) limit = AutoScrollPolicy.photoTime(photos, PHOTO_MS, music);
+            if (photos > 0 && Prefs.on(Prefs.SKIP_PHOTOS)) {
+                // Photo posts are passed over right away wherever the feed moves on by itself.
+                endedAt = 0;
+                MAIN.removeCallbacks(TICK);
+                MAIN.removeCallbacks(SKIP_PHOTO);
+                if (enabled(feedPanel) || recommended(feedPanel) && nativeForYou) MAIN.postDelayed(SKIP_PHOTO, 700L);
+                return;
+            }
         }
         endedAt = 0;
         MAIN.removeCallbacks(TICK);
+        MAIN.removeCallbacks(SKIP_PHOTO);
         if (enabled(feedPanel) && (duration > 0 || limit > 0)) MAIN.postDelayed(TICK, TICK_MS);
     }
 
@@ -510,10 +520,52 @@ final class AutoScroll {
         }
     };
 
+    /** Moves past the photo post that is shown, as long as it still is; retried while a sheet covers it. */
+    private static final Runnable SKIP_PHOTO = new Runnable() {
+        private int tries;
+
+        @Override public void run() {
+            try {
+                Object feedPanel = panel.get();
+                String id = playing;
+                if (feedPanel == null || id == null || !(Foreground.shown() || BackgroundPlay.away())) return;
+                Object aweme = invoke(currentAweme, feedPanel);
+                if (aweme == null || !id.equals(string(Reflect.get(aweme, "aid")))) {
+                    tries = 0;
+                    return;
+                }
+                if (next(feedPanel)) {
+                    tries = 0;
+                    last = -1;
+                    if (BackgroundPlay.away()) MAIN.postDelayed(FOLLOW, 1_500L);
+                } else if (++tries < 60) {
+                    MAIN.postDelayed(this, 1_000L);
+                } else {
+                    tries = 0;
+                }
+            } catch (Throwable error) {
+                Safe.log("skip photos", error);
+            }
+        }
+    };
+
+    /** The "next" button of the media controls: moves the feed that is shown on by one video. */
+    static void skip() {
+        Object feedPanel = shown.get();
+        if (feedPanel == null) return;
+        MAIN.removeCallbacks(TICK);
+        MAIN.removeCallbacks(SKIP_PHOTO);
+        if (next(feedPanel)) {
+            last = -1;
+            endedAt = 0;
+            MAIN.postDelayed(FOLLOW, 1_500L);
+        }
+    }
+
     /** After moving on in the background: picks up the new video even if it draws no frame. */
     private static final Runnable FOLLOW = () -> {
         try {
-            Object feedPanel = panel.get();
+            Object feedPanel = shown.get();
             // If its player does not start without a screen, background play starts it.
             if (feedPanel != null && BackgroundPlay.away()) started(feedPanel);
         } catch (Throwable error) {

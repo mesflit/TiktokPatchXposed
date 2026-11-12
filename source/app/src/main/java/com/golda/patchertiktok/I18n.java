@@ -80,7 +80,8 @@ final class I18n {
         REPOST_PURGE, REPOST_PURGE_COUNTING, REPOST_PURGE_CONFIRM, REPOST_PURGE_PROGRESS, REPOST_PURGE_NONE, REPOST_PURGE_STOPPED,
         CLASSIC_EMOJI, CLASSIC_EMOJI_DESC,
         OFFLINE_MORE, OFFLINE_MORE_DESC,
-        BACKGROUND_PLAY, BACKGROUND_PLAY_DESC
+        BACKGROUND_PLAY, BACKGROUND_PLAY_DESC,
+        MEDIA_CONTROLS, MEDIA_CONTROLS_DESC, SKIP_PHOTOS, SKIP_PHOTOS_DESC, MEDIA_CHANNEL, MEDIA_PLAY, MEDIA_PAUSE, MEDIA_NEXT, MEDIA_STOP
     }
 
     private static final Map<String, String[]> TABLES = new HashMap<>();
@@ -142,7 +143,8 @@ final class I18n {
                 "Remove all reposts", "Counting your reposts…", "%d reposts will be taken back. This can't be undone.", "Removed %1$d of %2$d", "You have no reposts", "Stopped: removed %d",
                 "Classic emojis", "Turns off TikTok's new emojis in comments, chats and reposts",
                 "More offline videos", "TikTok's offline viewing (profile menu → Offline videos) can keep up to 1500 videos. That takes about 5 GB",
-                "Background play", "Videos keep playing with the screen off or TikTok in the background. Auto-scroll keeps moving on if it is on. A call or another app's audio stops it"
+                "Background play", "Videos keep playing with the screen off or TikTok in the background. Auto-scroll keeps moving on if it is on. A call or another app's audio stops it",
+                "Media controls", "During background play: play/pause, next and stop in the notification, on the lock screen and with headset buttons", "Skip photo posts", "Auto-scroll moves past photo posts right away, in the background too", "Background play", "Play", "Pause", "Next", "Stop"
         });
         TABLES.put("ru", new String[]{
                 "TiktokPatchXposed", "Лента",
@@ -200,7 +202,8 @@ final class I18n {
                 "Удалить все репосты", "Считаем ваши репосты…", "Будет удалено репостов: %d. Отменить это нельзя.", "Удалено %1$d из %2$d", "Репостов нет", "Остановлено, удалено: %d",
                 "Обычные эмодзи", "Выключает новые эмодзи TikTok в комментариях, чатах и репостах",
                 "Больше видео офлайн", "Просмотр офлайн в TikTok (меню профиля → Видео офлайн) хранит до 1500 видео. Это около 5 ГБ",
-                "Фоновое воспроизведение", "Видео продолжают играть при выключенном экране или в фоне. Автопрокрутка, если включена, продолжает листать. Звонок или звук другого приложения останавливают его"
+                "Фоновое воспроизведение", "Видео продолжают играть при выключенном экране или в фоне. Автопрокрутка, если включена, продолжает листать. Звонок или звук другого приложения останавливают его",
+                "Управление в уведомлении", "При фоновом воспроизведении: пауза, следующее видео и стоп в уведомлении, на экране блокировки и кнопками гарнитуры", "Пропускать фото-посты", "Автопрокрутка сразу пролистывает фото-посты, в том числе в фоне", "Фоновое воспроизведение", "Играть", "Пауза", "Дальше", "Стоп"
         });
         TABLES.put("uk", new String[]{
                 "TiktokPatchXposed", "Стрічка",
@@ -258,7 +261,8 @@ final class I18n {
                 "Видалити всі репости", "Рахуємо ваші репости…", "Буде видалено репостів: %d. Скасувати це не можна.", "Видалено %1$d з %2$d", "Репостів немає", "Зупинено, видалено: %d",
                 "Звичайні емодзі", "Вимикає нові емодзі TikTok у коментарях, чатах і репостах",
                 "Більше відео офлайн", "Перегляд офлайн у TikTok (меню профілю → Відео офлайн) зберігає до 1500 відео. Це близько 5 ГБ",
-                "Фонове відтворення", "Відео продовжують грати з вимкненим екраном або у фоні. Автопрокрутка, якщо ввімкнена, продовжує гортати. Дзвінок або звук іншого застосунку зупиняють його"
+                "Фонове відтворення", "Відео продовжують грати з вимкненим екраном або у фоні. Автопрокрутка, якщо ввімкнена, продовжує гортати. Дзвінок або звук іншого застосунку зупиняють його",
+                "Керування в сповіщенні", "Під час фонового відтворення: пауза, наступне відео й стоп у сповіщенні, на екрані блокування та кнопками гарнітури", "Пропускати фото-пости", "Автопрокрутка одразу гортає фото-пости, зокрема у фоні", "Фонове відтворення", "Грати", "Пауза", "Далі", "Стоп"
         });
         TABLES.put("de", new String[]{
                 "TiktokPatchXposed", "Feed",
@@ -316,7 +320,8 @@ final class I18n {
                 "Alle Reposts entfernen", "Deine Reposts werden gezählt…", "%d Reposts werden zurückgenommen. Das lässt sich nicht rückgängig machen.", "%1$d von %2$d entfernt", "Du hast keine Reposts", "Gestoppt: %d entfernt",
                 "Klassische Emojis", "Schaltet TikToks neue Emojis in Kommentaren, Chats und Reposts ab",
                 "Mehr Offline-Videos", "TikToks Offline-Ansicht (Profilmenü → Offline-Videos) behält bis zu 1500 Videos. Das sind etwa 5 GB",
-                "Wiedergabe im Hintergrund", "Videos laufen bei ausgeschaltetem Bildschirm oder im Hintergrund weiter. Automatisches Scrollen läuft weiter, wenn es an ist. Ein Anruf oder der Ton einer anderen App beendet es"
+                "Wiedergabe im Hintergrund", "Videos laufen bei ausgeschaltetem Bildschirm oder im Hintergrund weiter. Automatisches Scrollen läuft weiter, wenn es an ist. Ein Anruf oder der Ton einer anderen App beendet es",
+                "Mediensteuerung", "Bei Wiedergabe im Hintergrund: Pause, Weiter und Stopp in der Benachrichtigung, auf dem Sperrbildschirm und mit Headset-Tasten", "Foto-Posts überspringen", "Automatisches Scrollen geht sofort an Foto-Posts vorbei, auch im Hintergrund", "Wiedergabe im Hintergrund", "Abspielen", "Pause", "Weiter", "Stopp"
         });
         TABLES.put("es", new String[]{
                 "TiktokPatchXposed", "Feed",
@@ -374,7 +379,8 @@ final class I18n {
                 "Eliminar todos los reposts", "Contando tus reposts…", "Se quitarán %d reposts. Esto no se puede deshacer.", "Eliminados %1$d de %2$d", "No tienes reposts", "Detenido: %d eliminados",
                 "Emojis clásicos", "Desactiva los nuevos emojis de TikTok en comentarios, chats y reposts",
                 "Más vídeos sin conexión", "La vista sin conexión de TikTok (menú del perfil → Vídeos sin conexión) guarda hasta 1500 vídeos. Ocupa unos 5 GB",
-                "Reproducción en segundo plano", "Los vídeos siguen sonando con la pantalla apagada o TikTok en segundo plano. El desplazamiento automático sigue si está activado. Una llamada o el audio de otra app lo detiene"
+                "Reproducción en segundo plano", "Los vídeos siguen sonando con la pantalla apagada o TikTok en segundo plano. El desplazamiento automático sigue si está activado. Una llamada o el audio de otra app lo detiene",
+                "Controles multimedia", "En segundo plano: pausa, siguiente y detener en la notificación, en la pantalla de bloqueo y con los botones del auricular", "Saltar publicaciones de fotos", "El desplazamiento automático pasa las publicaciones de fotos al instante, también en segundo plano", "Reproducción en segundo plano", "Reproducir", "Pausa", "Siguiente", "Detener"
         });
         TABLES.put("pt", new String[]{
                 "TiktokPatchXposed", "Feed",
@@ -432,7 +438,8 @@ final class I18n {
                 "Remover todos os reposts", "Contando seus reposts…", "%d reposts serão removidos. Isso não pode ser desfeito.", "Removidos %1$d de %2$d", "Você não tem reposts", "Parado: %d removidos",
                 "Emojis clássicos", "Desativa os novos emojis do TikTok em comentários, conversas e reposts",
                 "Mais vídeos offline", "A visualização offline do TikTok (menu do perfil → Vídeos offline) guarda até 1500 vídeos. Isso ocupa cerca de 5 GB",
-                "Reprodução em segundo plano", "Os vídeos continuam tocando com a tela desligada ou o TikTok em segundo plano. A rolagem automática continua se estiver ativada. Uma chamada ou o áudio de outro app a interrompe"
+                "Reprodução em segundo plano", "Os vídeos continuam tocando com a tela desligada ou o TikTok em segundo plano. A rolagem automática continua se estiver ativada. Uma chamada ou o áudio de outro app a interrompe",
+                "Controles de mídia", "Em segundo plano: pausar, próximo e parar na notificação, na tela de bloqueio e com os botões do fone", "Pular posts de fotos", "A rolagem automática passa os posts de fotos na hora, também em segundo plano", "Reprodução em segundo plano", "Reproduzir", "Pausar", "Próximo", "Parar"
         });
         TABLES.put("fr", new String[]{
                 "TiktokPatchXposed", "Fil",
@@ -490,7 +497,8 @@ final class I18n {
                 "Supprimer tous les reposts", "Comptage de vos reposts…", "%d reposts seront retirés. Cette action est irréversible.", "%1$d sur %2$d supprimés", "Vous n'avez aucun repost", "Arrêté : %d supprimés",
                 "Emojis classiques", "Désactive les nouveaux emojis de TikTok dans les commentaires, discussions et reposts",
                 "Plus de vidéos hors ligne", "Le visionnage hors ligne de TikTok (menu du profil → Vidéos hors ligne) garde jusqu'à 1500 vidéos. Cela prend environ 5 Go",
-                "Lecture en arrière-plan", "Les vidéos continuent avec l'écran éteint ou TikTok en arrière-plan. Le défilement automatique continue s'il est activé. Un appel ou le son d'une autre appli l'arrête"
+                "Lecture en arrière-plan", "Les vidéos continuent avec l'écran éteint ou TikTok en arrière-plan. Le défilement automatique continue s'il est activé. Un appel ou le son d'une autre appli l'arrête",
+                "Commandes multimédias", "En arrière-plan : pause, suivant et arrêt dans la notification, sur l'écran de verrouillage et avec les boutons du casque", "Passer les posts photo", "Le défilement automatique passe aussitôt les posts photo, en arrière-plan aussi", "Lecture en arrière-plan", "Lire", "Pause", "Suivant", "Arrêter"
         });
         TABLES.put("it", new String[]{
                 "TiktokPatchXposed", "Feed",
@@ -548,7 +556,8 @@ final class I18n {
                 "Rimuovi tutti i repost", "Conteggio dei tuoi repost…", "Verranno rimossi %d repost. Non si può annullare.", "Rimossi %1$d di %2$d", "Non hai repost", "Interrotto: %d rimossi",
                 "Emoji classiche", "Disattiva le nuove emoji di TikTok in commenti, chat e repost",
                 "Più video offline", "La visione offline di TikTok (menu del profilo → Video offline) conserva fino a 1500 video. Occupa circa 5 GB",
-                "Riproduzione in background", "I video continuano con lo schermo spento o TikTok in background. Lo scorrimento automatico continua se è attivo. Una chiamata o l'audio di un'altra app la interrompe"
+                "Riproduzione in background", "I video continuano con lo schermo spento o TikTok in background. Lo scorrimento automatico continua se è attivo. Una chiamata o l'audio di un'altra app la interrompe",
+                "Controlli multimediali", "In background: pausa, successivo e stop nella notifica, sulla schermata di blocco e con i tasti delle cuffie", "Salta i post di foto", "Lo scorrimento automatico supera subito i post di foto, anche in background", "Riproduzione in background", "Riproduci", "Pausa", "Successivo", "Stop"
         });
         TABLES.put("pl", new String[]{
                 "TiktokPatchXposed", "Kanał",
@@ -606,7 +615,8 @@ final class I18n {
                 "Usuń wszystkie reposty", "Liczenie repostów…", "Reposty do usunięcia: %d. Tego nie można cofnąć.", "Usunięto %1$d z %2$d", "Nie masz repostów", "Zatrzymano, usunięto: %d",
                 "Klasyczne emoji", "Wyłącza nowe emoji TikToka w komentarzach, czatach i repostach",
                 "Więcej filmów offline", "Oglądanie offline w TikToku (menu profilu → Filmy offline) przechowuje do 1500 filmów. To około 5 GB",
-                "Odtwarzanie w tle", "Filmy grają dalej przy wyłączonym ekranie lub z TikTokiem w tle. Automatyczne przewijanie działa dalej, jeśli jest włączone. Połączenie lub dźwięk innej aplikacji je zatrzymuje"
+                "Odtwarzanie w tle", "Filmy grają dalej przy wyłączonym ekranie lub z TikTokiem w tle. Automatyczne przewijanie działa dalej, jeśli jest włączone. Połączenie lub dźwięk innej aplikacji je zatrzymuje",
+                "Sterowanie multimediami", "Przy odtwarzaniu w tle: pauza, następny i stop w powiadomieniu, na ekranie blokady i przyciskami słuchawek", "Pomijaj posty ze zdjęciami", "Automatyczne przewijanie od razu pomija posty ze zdjęciami, także w tle", "Odtwarzanie w tle", "Odtwórz", "Pauza", "Dalej", "Stop"
         });
         TABLES.put("tr", new String[]{
                 "TiktokPatchXposed", "Akış",
@@ -664,7 +674,8 @@ final class I18n {
                 "Tüm yeniden paylaşımları kaldır", "Yeniden paylaşımlarınız sayılıyor…", "%d yeniden paylaşım kaldırılacak. Bu geri alınamaz.", "%2$d içinden %1$d kaldırıldı", "Yeniden paylaşımınız yok", "Durduruldu: %d kaldırıldı",
                 "Klasik emojiler", "Yorumlar, sohbetler ve yeniden paylaşımlarda TikTok'un yeni emojilerini kapatır",
                 "Daha fazla çevrimdışı video", "TikTok'un çevrimdışı izleme özelliği (profil menüsü → Çevrimdışı videolar) 1500 videoya kadar saklar. Yaklaşık 5 GB yer kaplar",
-                "Arka planda oynatma", "Ekran kapalıyken veya TikTok arka plandayken videolar oynamaya devam eder. Otomatik kaydırma açıksa kaydırmaya devam eder. Bir arama veya başka bir uygulamanın sesi durdurur"
+                "Arka planda oynatma", "Ekran kapalıyken veya TikTok arka plandayken videolar oynamaya devam eder. Otomatik kaydırma açıksa kaydırmaya devam eder. Bir arama veya başka bir uygulamanın sesi durdurur",
+                "Bildirim kontrolleri", "Arka planda oynatırken: bildirimde, kilit ekranında ve kulaklık tuşlarıyla oynat/duraklat, sonraki ve durdur", "Fotoğraf postlarını atla", "Otomatik kaydırma fotoğraf postlarını hemen geçer, arka planda da", "Arka planda oynatma", "Oynat", "Duraklat", "Sonraki", "Durdur"
         });
         TABLES.put("id", new String[]{
                 "TiktokPatchXposed", "Feed",
@@ -722,7 +733,8 @@ final class I18n {
                 "Hapus semua repost", "Menghitung repost Anda…", "%d repost akan dihapus. Ini tidak dapat dibatalkan.", "Dihapus %1$d dari %2$d", "Anda tidak punya repost", "Dihentikan: %d dihapus",
                 "Emoji klasik", "Mematikan emoji baru TikTok di komentar, obrolan, dan repost",
                 "Lebih banyak video offline", "Tontonan offline TikTok (menu profil → Video offline) menyimpan hingga 1500 video. Sekitar 5 GB",
-                "Putar di latar belakang", "Video tetap diputar saat layar mati atau TikTok di latar belakang. Gulir otomatis tetap berjalan jika aktif. Panggilan atau suara aplikasi lain menghentikannya"
+                "Putar di latar belakang", "Video tetap diputar saat layar mati atau TikTok di latar belakang. Gulir otomatis tetap berjalan jika aktif. Panggilan atau suara aplikasi lain menghentikannya",
+                "Kontrol media", "Saat putar di latar belakang: jeda, berikutnya, dan berhenti di notifikasi, layar kunci, dan tombol headset", "Lewati postingan foto", "Gulir otomatis langsung melewati postingan foto, juga di latar belakang", "Putar di latar belakang", "Putar", "Jeda", "Berikutnya", "Berhenti"
         });
         TABLES.put("ar", new String[]{
                 "TiktokPatchXposed", "الموجز", "حظر الإعلانات", "الإعلانات في الموجز وعند بدء التشغيل وقوائم الفيديو الأخرى", "إخفاء البث المباشر",
@@ -809,7 +821,8 @@ final class I18n {
                 "إزالة كل إعادات النشر", "جارٍ عدّ إعادات النشر…", "ستتم إزالة %d من إعادات النشر. لا يمكن التراجع عن ذلك.", "تمت إزالة %1$d من %2$d", "لا توجد لديك إعادات نشر", "توقف: تمت إزالة %d",
                 "الرموز التعبيرية الكلاسيكية", "يوقف رموز TikTok التعبيرية الجديدة في التعليقات والمحادثات وإعادات النشر",
                 "مزيد من مقاطع الفيديو دون اتصال", "تحتفظ مشاهدة TikTok دون اتصال (قائمة الملف الشخصي ← مقاطع الفيديو دون اتصال) بما يصل إلى 1500 مقطع. تشغل نحو 5 جيجابايت",
-                "التشغيل في الخلفية", "تستمر مقاطع الفيديو في التشغيل والشاشة مطفأة أو TikTok في الخلفية. يستمر التمرير التلقائي إن كان مفعّلًا. توقفه مكالمة أو صوت تطبيق آخر"
+                "التشغيل في الخلفية", "تستمر مقاطع الفيديو في التشغيل والشاشة مطفأة أو TikTok في الخلفية. يستمر التمرير التلقائي إن كان مفعّلًا. توقفه مكالمة أو صوت تطبيق آخر",
+                "عناصر التحكم بالوسائط", "أثناء التشغيل في الخلفية: إيقاف مؤقت والتالي والإيقاف في الإشعار وعلى شاشة القفل وبأزرار السماعة", "تخطي منشورات الصور", "يتخطى التمرير التلقائي منشورات الصور فورًا، في الخلفية أيضًا", "التشغيل في الخلفية", "تشغيل", "إيقاف مؤقت", "التالي", "إيقاف"
         });
         TABLES.put("zh", new String[]{
                 "TiktokPatchXposed", "推荐", "屏蔽广告", "推荐流、启动时和其他视频列表中的广告", "隐藏直播", "推荐流中的直播和 LIVE 按钮", "隐藏“你可能认识的人”", "根据你的通讯录推荐的视频",
@@ -870,7 +883,8 @@ final class I18n {
                 "移除所有转发", "正在统计你的转发…", "将移除 %d 条转发。此操作无法撤销。", "已移除 %1$d / %2$d", "你没有转发", "已停止：移除了 %d 条",
                 "经典表情", "关闭 TikTok 在评论、聊天和转发中的新表情",
                 "更多离线视频", "TikTok 离线观看（个人主页菜单 → 离线视频）最多保留 1500 个视频，约占 5 GB",
-                "后台播放", "屏幕关闭或 TikTok 在后台时视频继续播放。若开启自动滚动，会继续切换下一个视频。来电或其他应用的声音会停止播放"
+                "后台播放", "屏幕关闭或 TikTok 在后台时视频继续播放。若开启自动滚动，会继续切换下一个视频。来电或其他应用的声音会停止播放",
+                "媒体控制", "后台播放时：在通知、锁屏和耳机按键上暂停/播放、下一个和停止", "跳过图片帖子", "自动滚动立即跳过图片帖子，后台也是如此", "后台播放", "播放", "暂停", "下一个", "停止"
         });
     }
 

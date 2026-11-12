@@ -27,6 +27,10 @@ final class Prefs {
     static final String AUTO_SCROLL_PROFILES = "auto_scroll_profiles";
     /** Feed videos keep playing with the screen off or TikTok in the background. */
     static final String BACKGROUND_PLAY = "background_play";
+    /** During background play: a media notification with play/pause, next and stop. */
+    static final String MEDIA_CONTROLS = "background_media_controls";
+    /** Auto-scroll passes photo posts over right away. */
+    static final String SKIP_PHOTOS = "auto_scroll_skip_photos";
     static final String COMMENT_MEDIA = "comment_media_save";
     /** Favourite sticker sent by auto streaks instead of the flame; empty for the flame. */
     static final String STREAK_STICKER = "auto_streak_sticker_id";
@@ -196,6 +200,8 @@ final class Prefs {
         DEFAULTS.put(AUTO_SCROLL, false);
         DEFAULTS.put(AUTO_SCROLL_PROFILES, false);
         DEFAULTS.put(BACKGROUND_PLAY, false);
+        DEFAULTS.put(MEDIA_CONTROLS, true);
+        DEFAULTS.put(SKIP_PHOTOS, false);
         DEFAULTS.put(COMMENT_MEDIA, true);
         DEFAULTS.put(SAVE_ALL_PHOTOS, false);
         DEFAULTS.put(COMMENT_REPOSTS, true);

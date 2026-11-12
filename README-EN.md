@@ -7,7 +7,7 @@ turns on features TikTok rolls out only to some people, and adds many small thin
 everywhere, your own color, font and AMOLED theme, hiding parts of the screen, country flags,
 invisible mode and auto streaks. All settings live right inside TikTok.
 
-Current version: **4.4.5**. Tested on **TikTok 47.5.3**, **47.4.3** and **47.1.4** (Google Play and universal APK),
+Current version: **4.4.6**. Tested on **TikTok 47.5.3**, **47.4.3** and **47.1.4** (Google Play and universal APK),
 **Android 16**. Most features find what they need in TikTok by themselves, so
 they survive TikTok updates.
 
@@ -55,7 +55,8 @@ Features marked 🧪 work but are not fully tested. All new features are off by 
 - **Own filter**: by words, hashtags, authors, countries, minimum likes and views.
 
 ### Playback
-- 🧪 **Background play** — videos keep playing with the screen off or TikTok in the background; auto-scroll keeps moving on.
+- 🧪 **Background play** — videos keep playing with the screen off or TikTok in the background; auto-scroll keeps moving on; pause, next and stop in the notification, on the lock screen and with headset buttons.
+- **Skip photo posts** — auto-scroll moves past photo posts right away.
 - **Auto-scroll everywhere**: in search, following and chats; profiles and liked videos have their own switch in the
   long-press menu. Off everywhere by default; photo posts by music length.
 - **Exact date and time**: on videos, stories, comments and reposts, with seconds if you like.
