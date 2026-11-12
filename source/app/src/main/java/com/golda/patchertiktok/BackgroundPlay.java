@@ -62,6 +62,8 @@ final class BackgroundPlay {
     private static PowerManager.WakeLock lock;
     private static long lastPosition = -1;
     private static int stalls;
+    /** Restart attempts since the video last moved; a few, then it waits for a change. */
+    private static int resumes;
 
     private BackgroundPlay() { }
 
@@ -126,6 +128,49 @@ final class BackgroundPlay {
         trace("made " + calls.size() + " held-back engine call(s)");
     }
 
+    /** Every simple getter of the playing engine with its value, to learn which one is its clock. */
+    private static void dumpEngine(String when) {
+        Object current = engine.get();
+        if (!away || current == null) return;
+        StringBuilder out = new StringBuilder("engine " + current.getClass().getName() + " " + when + ":");
+        int count = 0;
+        for (Class<?> type = current.getClass(); type != null && type != Object.class && count < 60; type = type.getSuperclass()) {
+            for (Method method : Reflect.methods(type)) {
+                Class<?> result = method.getReturnType();
+                if (method.getParameterTypes().length != 0 || Modifier.isStatic(method.getModifiers())
+                        || !(result == int.class || result == long.class || result == boolean.class || result == float.class)) continue;
+                String name = method.getName();
+                if (name.startsWith("set") || name.startsWith("release") || name.startsWith("stop") || name.startsWith("play")
+                        || name.startsWith("pause") || name.startsWith("prepare") || name.startsWith("start")) continue;
+                try {
+                    method.setAccessible(true);
+                    out.append(' ').append(name).append('=').append(method.invoke(current));
+                } catch (Throwable error) {
+                    out.append(' ').append(name).append("=!");
+                }
+                if (++count >= 60) break;
+            }
+        }
+        trace(out.toString());
+    }
+
+    /** Surface events of video views while away: when the picture's surface goes, the player may stop. */
+    private static void traceSurfaces() {
+        Hooks.Hook surface = new Hooks.Hook() {
+            @Override protected void before(Hooks.Call param) {
+                if (away) trace(param.method.getDeclaringClass().getSimpleName() + "." + param.method.getName() + caller());
+            }
+        };
+        int hooks = 0;
+        for (String name : new String[]{"releaseSurfaceTexture", "destroyHardwareLayer", "onDetachedFromWindowInternal"}) {
+            hooks += Hooks.hookAll(android.view.TextureView.class, name, surface);
+        }
+        for (String name : new String[]{"notifySurfaceDestroyed", "onWindowVisibilityChanged", "onDetachedFromWindow"}) {
+            hooks += Hooks.hookAll(android.view.SurfaceView.class, name, surface);
+        }
+        RuntimeLog.log("background play: surface traces=" + hooks);
+    }
+
     /** The first TikTok frames of the current call, for the log. */
     private static String caller() {
         StringBuilder out = new StringBuilder();
@@ -135,7 +180,7 @@ final class BackgroundPlay {
             if (type.startsWith("com.golda.") || type.startsWith("java.") || type.startsWith("dalvik.")
                     || type.startsWith("android.") || type.contains("xposed") || type.contains("lsposed") || type.startsWith("LSP")) continue;
             out.append(shown == 0 ? " from " : " < ").append(type.substring(type.lastIndexOf('.') + 1)).append('.').append(frame.getMethodName());
-            if (++shown == 4) break;
+            if (++shown == 16) break;
         }
         return out.toString();
     }
@@ -248,6 +293,11 @@ final class BackgroundPlay {
         Foreground.listenAway(BackgroundPlay::putAway);
         Foreground.listen(BackgroundPlay::back);
         watchFocus();
+        try {
+            traceSurfaces();
+        } catch (Throwable error) {
+            Safe.log("background surface trace", error);
+        }
     }
 
     /** Skips the panel's own pause and stop while away; found by name on the panel and its subclasses. */
@@ -356,8 +406,11 @@ final class BackgroundPlay {
         shownId = null;
         lastPosition = -1;
         stalls = 0;
+        resumes = 0;
         holdLock();
         traceTicks = 10;
+        MAIN.postDelayed(Safe.run("background trace", () -> dumpEngine("at start")), 300L);
+        MAIN.postDelayed(Safe.run("background trace", () -> dumpEngine("3s later")), 3_300L);
         MAIN.removeCallbacks(WATCH);
         MAIN.postDelayed(WATCH, WATCH_MS);
         // A pause can come from the player's own thread; auto-scroll and the notification live on the main one.
@@ -508,13 +561,15 @@ final class BackgroundPlay {
             if (value instanceof Number && SystemClock.uptimeMillis() >= movingUntil) {
                 long position = ((Number) value).longValue();
                 if (position == lastPosition) {
-                    if (++stalls >= 2) {
+                    if (++stalls >= 2 && resumes < 5) {
+                        resumes++;
                         trace("stalled at " + position + ", resuming");
                         resume();
                         stalls = 0;
                     }
                 } else {
                     stalls = 0;
+                    resumes = 0;
                 }
                 lastPosition = position;
             }

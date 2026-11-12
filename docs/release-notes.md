@@ -1,4 +1,10 @@
-## 4.4.9 (fork)
+## 4.5.0 (fork)
+
+Diagnostics for background play: where TikTok's player release comes from, the video engine's state, and when video surfaces go away. Restart attempts are capped.
+
+Arka planda oynatma için teşhis: TikTok'un oynatıcıyı neden kapattığı, video motorunun durumu ve görüntü yüzeyinin ne zaman yok olduğu kaydedilir.
+
+## 4.4.9
 
 **Fix:** TikTok frees its video player about a second after it is put away, so background play stopped right away.
 While background play runs, that release is held back and made once TikTok is open again or the feed moves on.
