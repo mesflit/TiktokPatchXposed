@@ -62,9 +62,17 @@ final class BackgroundPlay {
     private static PowerManager.WakeLock lock;
     private static long lastPosition = -1;
     private static int stalls;
-    private static boolean loggedResume;
 
     private BackgroundPlay() { }
+
+    private static final java.util.concurrent.atomic.AtomicInteger TRACED = new java.util.concurrent.atomic.AtomicInteger();
+    /** Ticks still to trace after TikTok was put away or the feed moved on. */
+    private static int traceTicks;
+
+    /** A line about background play for bug reports; capped, so a long night in the background does not flood the log. */
+    static void trace(String what) {
+        if (TRACED.incrementAndGet() <= 400) RuntimeLog.log("bg: " + what);
+    }
 
     /** True while TikTok is put away and its feed video is kept playing. */
     static boolean away() {
@@ -74,6 +82,7 @@ final class BackgroundPlay {
     /** A feed is moving on to its next video: let the old one pause. */
     static void moving() {
         movingUntil = SystemClock.uptimeMillis() + MOVE_MS;
+        if (away) traceTicks = 10;
     }
 
     /** Hooks; each reads the switch on every call, so they go in before the settings load. */
@@ -106,7 +115,10 @@ final class BackgroundPlay {
                 if ("play".equals(method.getName()) && method.getParameterTypes().length == 0) {
                     if (Hooks.tryHook(method, new Hooks.Hook() {
                         @Override protected void after(Hooks.Call param) {
-                            if (!away || SystemClock.uptimeMillis() < movingUntil) engine = new WeakReference<>(param.thisObject);
+                            boolean moving = SystemClock.uptimeMillis() < movingUntil;
+                            if (away) trace("engine play " + Integer.toHexString(System.identityHashCode(param.thisObject))
+                                    + (moving ? " (moving)" : "") + (param.thisObject == engine.get() ? " same" : " other"));
+                            if (!away || moving) engine = new WeakReference<>(param.thisObject);
                         }
                     })) hooks++;
                 } else if ("pause".equals(method.getName())) {
@@ -115,7 +127,10 @@ final class BackgroundPlay {
                             // Only the engine of the current video; preloaded ones pause as usual.
                             if (param.thisObject != engine.get()) return;
                             pausing();
-                            if (blocking()) param.setResult(null);
+                            if (blocking()) {
+                                param.setResult(null);
+                                trace("engine pause skipped");
+                            }
                         }
                     })) hooks++;
                 }
@@ -175,7 +190,10 @@ final class BackgroundPlay {
         return Hooks.tryHook(method, new Hooks.Hook() {
             @Override protected void before(Hooks.Call param) {
                 pausing();
-                if (blocking()) param.setResult(null);
+                if (blocking()) {
+                    param.setResult(null);
+                    trace("skipped " + method.getDeclaringClass().getSimpleName() + "." + method.getName());
+                }
             }
         });
     }
@@ -250,6 +268,7 @@ final class BackgroundPlay {
         lastPosition = -1;
         stalls = 0;
         holdLock();
+        traceTicks = 10;
         MAIN.removeCallbacks(WATCH);
         MAIN.postDelayed(WATCH, WATCH_MS);
         // A pause can come from the player's own thread; auto-scroll and the notification live on the main one.
@@ -379,6 +398,16 @@ final class BackgroundPlay {
                 return;
             }
             notifyNow(false);
+            if (traceTicks > 0) {
+                traceTicks--;
+                Object tracedPanel = panel.get();
+                Object aweme = tracedPanel == null ? null : invoke(currentAweme, tracedPanel);
+                Object current = engine.get();
+                trace("tick id=" + (aweme == null ? null : Reflect.get(aweme, "aid"))
+                        + " pos=" + (tracedPanel == null ? null : Reflect.call(invoke(playerAbility, tracedPanel), "getCurrentPosition"))
+                        + " playing=" + playing() + " engine=" + (current == null ? "none" : Reflect.call(current, "getPlaybackState"))
+                        + (userPaused ? " userPaused" : ""));
+            }
             if (userPaused) {
                 MAIN.postDelayed(this, WATCH_MS);
                 return;
@@ -389,6 +418,7 @@ final class BackgroundPlay {
                 long position = ((Number) value).longValue();
                 if (position == lastPosition) {
                     if (++stalls >= 2) {
+                        trace("stalled at " + position + ", resuming");
                         resume();
                         stalls = 0;
                     }
@@ -411,6 +441,8 @@ final class BackgroundPlay {
         if (current != null && Reflect.method(current.getClass(), "play") != null) {
             Reflect.call(current, "play");
             note("engine.play");
+        } else {
+            trace("resume: no way to start the player");
         }
     }
 
@@ -431,9 +463,7 @@ final class BackgroundPlay {
     }
 
     private static void note(String how) {
-        if (loggedResume) return;
-        loggedResume = true;
-        RuntimeLog.log("background play: resumed with " + how);
+        trace("resumed with " + how);
     }
 
     /** Whether the feed video plays now; when nothing tells, it is taken as playing. */

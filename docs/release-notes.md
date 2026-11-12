@@ -1,4 +1,10 @@
-## 4.4.7 (fork)
+## 4.4.8 (fork)
+
+Diagnostics: the bug report traces background play step by step (player position, engine state, each move), to find why auto-scroll stops in the background.
+
+Teşhis: hata raporu arka planda oynatmayı adım adım kaydeder (oynatıcı konumu, motor durumu, her geçiş).
+
+## 4.4.7
 
 **Fix:** auto-scroll in the background also moves on when TikTok stops a video at its end instead of looping it.
 The bug report (Settings → More → Bug report) now shows what auto-scroll did in the background.

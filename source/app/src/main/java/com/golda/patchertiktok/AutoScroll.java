@@ -61,11 +61,9 @@ final class AutoScroll {
     private static long endedAt;
     /** Ticks the position stood still near the end: in the background TikTok may not loop the video. */
     private static int stuck;
-    /** What happened with auto-scroll in the background, written to the log once per kind. */
-    private static final java.util.Set<String> NOTED = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
-
+    /** What happened with auto-scroll in the background, for bug reports. */
     private static void note(String what) {
-        if (NOTED.add(what)) RuntimeLog.log("auto-scroll background: " + what);
+        BackgroundPlay.trace("auto-scroll: " + what + (playing == null ? "" : " [" + playing + "]"));
     }
 
     private AutoScroll() { }
@@ -590,7 +588,10 @@ final class AutoScroll {
         try {
             Object feedPanel = shown.get();
             // If its player does not start without a screen, background play starts it.
-            if (feedPanel != null && BackgroundPlay.away()) started(feedPanel);
+            if (feedPanel != null && BackgroundPlay.away()) {
+                started(feedPanel);
+                note("following the next video");
+            }
         } catch (Throwable error) {
             Safe.log("auto-scroll", error);
         }
