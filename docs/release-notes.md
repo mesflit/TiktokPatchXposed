@@ -1,4 +1,10 @@
-## 4.5.0 (fork)
+## 4.5.1 (fork)
+
+**Fix attempt:** when the screen goes off, Android removes the video's surface and TikTok stops its player. The playing video is now moved to a hidden surface just before that, and TikTok is not told, so the video should keep playing.
+
+**Düzeltme denemesi:** ekran kapanınca Android videonun görüntü yüzeyini kaldırıyor ve TikTok oynatıcıyı durduruyordu. Artık video, yüzey kalkmadan hemen önce görünmeyen bir yüzeye aktarılıyor; TikTok'a haber verilmiyor.
+
+## 4.5.0
 
 Diagnostics for background play: where TikTok's player release comes from, the video engine's state, and when video surfaces go away. Restart attempts are capped.
 

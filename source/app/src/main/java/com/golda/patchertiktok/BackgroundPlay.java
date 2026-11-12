@@ -4,6 +4,7 @@ import android.app.Application;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.media.AudioManager;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
@@ -87,6 +88,141 @@ final class BackgroundPlay {
         if (away) traceTicks = 10;
         // The old video's engine was held on; now it may go.
         flush();
+    }
+
+    /** The surface TikTok gave the engine last, how, and the stand-in used while the screen is gone. */
+    private static volatile Object surfaceOwner;
+    private static volatile Method surfaceSetter;
+    private static volatile android.view.Surface lastSurface;
+    private static volatile Object lastHolder;
+    private static Object standIn;
+    private static Handler drain;
+
+    /** Notes every surface or surface holder TikTok hands an engine; found by parameter type, so names do not matter. */
+    private static int watchSurfaces(Class<?> type) {
+        if (!HOOKED.add("surfaces:" + type.getName())) return 0;
+        int hooks = 0;
+        for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
+            for (Method method : Reflect.methods(current)) {
+                Class<?>[] parameters = method.getParameterTypes();
+                if (parameters.length != 1 || Modifier.isAbstract(method.getModifiers()) || Modifier.isStatic(method.getModifiers())) continue;
+                boolean surface = parameters[0] == android.view.Surface.class;
+                boolean holder = parameters[0] == android.view.SurfaceHolder.class;
+                if (!surface && !holder || !HOOKED.add(method)) continue;
+                if (Hooks.tryHook(method, new Hooks.Hook() {
+                    @Override protected void before(Hooks.Call param) {
+                        // Our own stand-in going in is not TikTok's choice.
+                        if (param.args[0] != null && param.args[0] == currentStandInSurface()) return;
+                        if (surface) {
+                            if (param.args[0] != null) {
+                                surfaceOwner = param.thisObject;
+                                surfaceSetter = method;
+                                lastSurface = (android.view.Surface) param.args[0];
+                            }
+                        } else if (param.args[0] != null) {
+                            surfaceOwner = param.thisObject;
+                            lastHolder = param.args[0];
+                        }
+                        if (away) trace("engine " + method.getName() + "(" + (param.args[0] == null ? "null" : parameters[0].getSimpleName()) + ")");
+                    }
+                })) hooks++;
+            }
+        }
+        return hooks;
+    }
+
+    private static android.view.Surface currentStandInSurface() {
+        Object reader = standIn;
+        if (reader == null || Build.VERSION.SDK_INT < 29) return null;
+        try {
+            return ((android.media.ImageReader) reader).getSurface();
+        } catch (Throwable error) {
+            return null;
+        }
+    }
+
+    /**
+     * A surface nobody sees: the decoder keeps drawing into it, each frame thrown away at once.
+     * Android 10 and later; earlier there is no stand-in.
+     */
+    private static android.view.Surface standIn() {
+        if (Build.VERSION.SDK_INT < 29) return null;
+        if (standIn == null) {
+            if (drain == null) {
+                android.os.HandlerThread thread = new android.os.HandlerThread("TiktokPatchXposed-frames");
+                thread.start();
+                drain = new Handler(thread.getLooper());
+            }
+            android.media.ImageReader reader = android.media.ImageReader.newInstance(720, 1280,
+                    android.graphics.ImageFormat.PRIVATE, 4, android.hardware.HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE);
+            reader.setOnImageAvailableListener(source -> {
+                try {
+                    android.media.Image image = source.acquireLatestImage();
+                    if (image != null) image.close();
+                } catch (Throwable ignored) {
+                    // A frame missed; the next one comes.
+                }
+            }, drain);
+            standIn = reader;
+        }
+        return ((android.media.ImageReader) standIn).getSurface();
+    }
+
+    /**
+     * A video surface is going away while TikTok is put away. If it is the one the playing engine
+     * draws into, the engine moves to the stand-in first and TikTok is not told, so it does not
+     * stop its player. Other surfaces (preloaded videos) go as usual.
+     */
+    private static void installSurfaceGuard() {
+        Hooks.Hook guard = new Hooks.Hook() {
+            @Override protected void before(Hooks.Call param) {
+                if (!blocking() || !(param.thisObject instanceof android.view.SurfaceView)) return;
+                android.view.SurfaceHolder holder = ((android.view.SurfaceView) param.thisObject).getHolder();
+                android.view.Surface surface = holder == null ? null : holder.getSurface();
+                boolean ours = surface != null && surface == lastSurface || holder != null && holder == lastHolder;
+                if (!ours) return;
+                Object owner = surfaceOwner;
+                Method setter = surfaceSetter != null ? surfaceSetter : surfaceMethod(owner);
+                android.view.Surface replacement = standIn();
+                if (owner == null || setter == null || replacement == null) {
+                    trace("surface going, no way to move the video (owner=" + (owner != null) + " setter=" + (setter != null) + ")");
+                    return;
+                }
+                try {
+                    setter.invoke(owner, replacement);
+                    param.setResult(null);
+                    trace("video moved to a hidden surface with " + setter.getName());
+                } catch (Throwable error) {
+                    trace("moving the video failed: " + error);
+                }
+            }
+        };
+        int hooks = Hooks.hookAll(android.view.SurfaceView.class, "notifySurfaceDestroyed", guard);
+        RuntimeLog.log("background play: surface guards=" + hooks);
+    }
+
+    /** A method of {@code owner} that takes a surface, when TikTok used a holder instead. */
+    private static Method surfaceMethod(Object owner) {
+        if (owner == null) return null;
+        for (Class<?> type = owner.getClass(); type != null && type != Object.class; type = type.getSuperclass()) {
+            for (Method method : Reflect.methods(type)) {
+                Class<?>[] parameters = method.getParameterTypes();
+                if (parameters.length == 1 && parameters[0] == android.view.Surface.class && method.getReturnType() == void.class
+                        && !Modifier.isStatic(method.getModifiers()) && !Modifier.isAbstract(method.getModifiers())) {
+                    method.setAccessible(true);
+                    return method;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Back on the screen: TikTok sets up its own surface again; the stand-in goes once it no longer draws. */
+    private static void dropStandIn() {
+        Object reader = standIn;
+        if (reader == null) return;
+        standIn = null;
+        MAIN.postDelayed(Safe.run("background stand-in", () -> ((android.media.ImageReader) reader).close()), 3_000L);
     }
 
     /** Engine calls that end playback: TikTok frees the player when its screen stops. */
@@ -221,6 +357,7 @@ final class BackgroundPlay {
             }
         }
         Class<?> engineType = Hooks.findClass(ENGINE, loader);
+        if (engineType != null) hooks += watchSurfaces(engineType);
         if (engineType != null) {
             for (Method method : Reflect.methods(engineType)) {
                 if (method.getReturnType() != void.class || Modifier.isAbstract(method.getModifiers())) continue;
@@ -231,6 +368,7 @@ final class BackgroundPlay {
                             if (away) trace("engine play " + Integer.toHexString(System.identityHashCode(param.thisObject))
                                     + (moving ? " (moving)" : "") + (param.thisObject == engine.get() ? " same" : " other"));
                             if (!away || moving) engine = new WeakReference<>(param.thisObject);
+                            watchSurfaces(param.thisObject.getClass());
                         }
                     })) hooks++;
                 } else if (ends(method.getName())) {
@@ -293,6 +431,11 @@ final class BackgroundPlay {
         Foreground.listenAway(BackgroundPlay::putAway);
         Foreground.listen(BackgroundPlay::back);
         watchFocus();
+        try {
+            installSurfaceGuard();
+        } catch (Throwable error) {
+            Safe.log("background surface guard", error);
+        }
         try {
             traceSurfaces();
         } catch (Throwable error) {
@@ -430,6 +573,7 @@ final class BackgroundPlay {
         away = false;
         userPaused = false;
         flush();
+        dropStandIn();
         MAIN.removeCallbacks(WATCH);
         releaseLock();
         MAIN.post(Safe.run("media controls", MediaControls::hide));
