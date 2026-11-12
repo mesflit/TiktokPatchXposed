@@ -10,8 +10,8 @@ android {
         applicationId = "com.golda.patchertiktok"
         minSdk = 27
         targetSdk = 36
-        versionCode = 53
-        versionName = "4.4.4"
+        versionCode = 54
+        versionName = "4.4.5"
     }
     buildFeatures {
         buildConfig = true
@@ -21,11 +21,24 @@ android {
         localeFilters += listOf("en", "ru", "uk", "be", "de", "es", "pt", "fr", "it", "pl", "tr", "in", "ar")
     }
 
+    signingConfigs {
+        // A fixed key kept in the repository, so every CI build of this fork installs over the last one.
+        create("fork") {
+            storeFile = file("fork.keystore")
+            storePassword = "android"
+            keyAlias = "fork"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("fork")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("fork")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

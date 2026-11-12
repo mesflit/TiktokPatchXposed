@@ -55,6 +55,10 @@ final class AutoScroll {
     private static Class<?> recommendPanel;
     /** The feed panel that last showed a video, For You included. */
     private static WeakReference<Object> shown = new WeakReference<>(null);
+    /** TikTok's own auto-scroll moved For You on in this session: its switch is on. */
+    private static volatile boolean nativeForYou;
+    /** For You in the background: when its video was seen ending, so TikTok gets a moment to move first. */
+    private static long endedAt;
 
     private AutoScroll() { }
 
@@ -85,7 +89,7 @@ final class AutoScroll {
                 @Override protected void after(Hooks.Call param) {
                     shown = new WeakReference<>(param.thisObject);
                     // The panel is remembered even when off, so the switch can start right away.
-                    if (!recommended(param.thisObject)) started(param.thisObject);
+                    if (!recommended(param.thisObject) || BackgroundPlay.away()) started(param.thisObject);
                 }
             });
         }
@@ -122,7 +126,12 @@ final class AutoScroll {
                 if (step == null || step.getReturnType() != void.class || step.getParameterCount() != 0) continue;
                 Hooks.hook(step, new Hooks.Hook() {
                     @Override protected void before(Hooks.Call param) {
-                        if (!"first_show_auto_scroll".equals(invoke(feedKey, param.thisObject))) param.setResult(null);
+                        if (!"first_show_auto_scroll".equals(invoke(feedKey, param.thisObject))) {
+                            param.setResult(null);
+                            return;
+                        }
+                        nativeForYou = true;
+                        BackgroundPlay.moving();
                     }
                 });
                 hooks++;
@@ -427,8 +436,25 @@ final class AutoScroll {
             long music = seconds instanceof Number ? ((Number) seconds).longValue() * 1_000L : 0L;
             if (photos > 0) limit = AutoScrollPolicy.photoTime(photos, PHOTO_MS, music);
         }
+        endedAt = 0;
         MAIN.removeCallbacks(TICK);
-        if (Prefs.on(key(feedPanel)) && (duration > 0 || limit > 0)) MAIN.postDelayed(TICK, TICK_MS);
+        if (enabled(feedPanel) && (duration > 0 || limit > 0)) MAIN.postDelayed(TICK, TICK_MS);
+    }
+
+    /**
+     * Whether this feed moves on by itself. For You is TikTok's own; but while TikTok is put away
+     * its auto-scroll may stand still, so there this one takes over when TikTok's switch was seen
+     * working, or when auto-scroll everywhere is on.
+     */
+    private static boolean enabled(Object feedPanel) {
+        if (recommended(feedPanel)) return BackgroundPlay.away() && (nativeForYou || Prefs.on(Prefs.AUTO_SCROLL));
+        return Prefs.on(key(feedPanel));
+    }
+
+    /** Called when TikTok is put away with background play: the feed shown keeps its auto-scroll going. */
+    static void putAway() {
+        Object current = shown.get();
+        if (current != null && enabled(current)) started(current);
     }
 
     private static final Runnable TICK = new Runnable() {
@@ -443,17 +469,39 @@ final class AutoScroll {
         private void step() {
             Object feedPanel = panel.get();
             String id = playing;
-            if (feedPanel == null || id == null || !Prefs.on(key(feedPanel)) || !Foreground.shown()) return;
+            boolean background = BackgroundPlay.away();
+            if (feedPanel == null || id == null || !enabled(feedPanel) || !(Foreground.shown() || background)) return;
             Object aweme = invoke(currentAweme, feedPanel);
-            if (aweme == null || !id.equals(string(Reflect.get(aweme, "aid")))) return;
+            String now = aweme == null ? null : string(Reflect.get(aweme, "aid"));
+            if (now == null) {
+                if (background) MAIN.postDelayed(this, TICK_MS);
+                return;
+            }
+            if (!id.equals(now)) {
+                // In the background the next video may never draw its first frame: follow it here.
+                if (background) started(feedPanel);
+                return;
+            }
             Object value = Reflect.call(invoke(playerAbility, feedPanel), "getCurrentPosition");
             if (value instanceof Number) {
                 long position = ((Number) value).longValue();
                 boolean done = limit > 0
                         ? position >= limit || AutoScrollPolicy.looped(last, position, limit)
                         : AutoScrollPolicy.looped(last, position, duration);
+                if ((done || endedAt != 0) && background && recommended(feedPanel)) {
+                    // TikTok's own auto-scroll may still move For You; give it a moment first.
+                    long time = android.os.SystemClock.uptimeMillis();
+                    if (endedAt == 0) endedAt = time;
+                    done = time - endedAt >= 1_500L;
+                    if (!done) {
+                        MAIN.postDelayed(this, TICK_MS);
+                        return;
+                    }
+                }
                 if (done && next(feedPanel)) {
                     last = -1;
+                    endedAt = 0;
+                    if (background) MAIN.postDelayed(FOLLOW, 1_500L);
                     return;
                 }
                 last = position;
@@ -462,10 +510,24 @@ final class AutoScroll {
         }
     };
 
+    /** After moving on in the background: picks up the new video even if it draws no frame. */
+    private static final Runnable FOLLOW = () -> {
+        try {
+            Object feedPanel = panel.get();
+            // If its player does not start without a screen, background play starts it.
+            if (feedPanel != null && BackgroundPlay.away()) started(feedPanel);
+        } catch (Throwable error) {
+            Safe.log("auto-scroll", error);
+        }
+    };
+
     private static boolean next(Object feedPanel) {
         Activity activity = activity(feedPanel);
+        boolean background = BackgroundPlay.away();
+        if (activity == null || activity.isFinishing()) return false;
         // A comment sheet, share menu or dialog has the focus: the user is busy with this video.
-        if (activity == null || activity.isFinishing() || !activity.hasWindowFocus()) return false;
+        // Put away, nothing has the focus.
+        if (!background && !activity.hasWindowFocus()) return false;
         Object view = invoke(pager, feedPanel);
         if (view == null) return false;
         Object current = Reflect.call(view, "getCurrentItem");
@@ -474,8 +536,10 @@ final class AutoScroll {
         Object adapter = Reflect.call(view, "getAdapter");
         Object count = adapter == null ? null : Reflect.call(adapter, "getCount");
         if (count instanceof Integer && target >= (Integer) count) return false;
+        BackgroundPlay.moving();
         try {
-            view.getClass().getMethod("setCurrentItem", int.class, boolean.class).invoke(view, target, true);
+            // With no screen there are no frames, so a smooth scroll would never finish.
+            view.getClass().getMethod("setCurrentItem", int.class, boolean.class).invoke(view, target, !background);
             return true;
         } catch (Throwable smooth) {
             try {

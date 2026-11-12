@@ -464,6 +464,7 @@ public final class ModSettingsActivity extends Activity {
             new Setting(Category.FEED, S.GROUP_FILTERS, S.HIDE_SEEN, S.HIDE_SEEN_DESC, Prefs.HIDE_SEEN),
             new Setting(Category.FEED, S.GROUP_FILTERS, S.CUSTOM_FILTER, S.CUSTOM_FILTER_DESC, Prefs.CUSTOM_FILTER),
             new Setting(Category.PLAYBACK, S.GROUP_PLAYBACK, S.AUTO_SCROLL, S.AUTO_SCROLL_DESC, Prefs.AUTO_SCROLL),
+            new Setting(Category.PLAYBACK, S.GROUP_PLAYBACK, S.BACKGROUND_PLAY, S.BACKGROUND_PLAY_DESC, Prefs.BACKGROUND_PLAY),
             new Setting(Category.PLAYBACK, S.GROUP_PLAYBACK, S.NO_DOUBLE_TAP_LIKE, S.NO_DOUBLE_TAP_LIKE_DESC, Prefs.NO_DOUBLE_TAP_LIKE),
             new Setting(Category.PLAYBACK, S.GROUP_PLAYBACK, S.REMEMBER_SPEED, S.REMEMBER_SPEED_DESC, Prefs.REMEMBER_SPEED),
             new Setting(Category.PLAYBACK, S.GROUP_PLAYBACK, S.RESUME_POSITION, S.RESUME_POSITION_DESC, Prefs.RESUME_POSITION),
@@ -802,7 +803,7 @@ public final class ModSettingsActivity extends Activity {
     private static final String[][] FEATURE_TITLES = {
             {"feed filter", "ADS"}, {"search ads", "PROMO"}, {"rendered ads", "ADS"}, {"startup ads", "ADS"},
             {"LIVE button", "LIVE"}, {"seekbar", "SEEKBAR"}, {"remember clear display", "REMEMBER_CLEAN"},
-            {"resume position", "RESUME_POSITION"}, {"playback speed", "REMEMBER_SPEED"}, {"downloads plus", "QUALITY_PICKER"}, {"auto-scroll", "AUTO_SCROLL"}, {"comment media", "COMMENT_MEDIA"},
+            {"resume position", "RESUME_POSITION"}, {"playback speed", "REMEMBER_SPEED"}, {"downloads plus", "QUALITY_PICKER"}, {"auto-scroll", "AUTO_SCROLL"}, {"background play", "BACKGROUND_PLAY"}, {"comment media", "COMMENT_MEDIA"},
             {"comment copy", "COPY_COMMENT"}, {"external browser", "EXTERNAL_BROWSER"},
             {"interface", "HIDE_INBOX_STORIES"}, {"overlay", "OVERLAY_OPACITY"}, {"accent color", "ACCENT"},
             {"seen videos", "HIDE_SEEN"}, {"author region", "AUTHOR_REGION"}, {"comment author", "COMMENT_HANDLE"}, {"comment limit", "COMMENT_NO_LIMIT"}, {"offline videos", "OFFLINE_MORE"}, {"exact time", "EXACT_TIME"}, {"exact counts", "EXACT_COUNTS"}, {"keep brightness", "KEEP_BRIGHTNESS"}, {"device checks", "HIDE_ROOT"}, {"playback quality", "PREFER_H264"}, {"photo quality", "PHOTO_BEST"}, {"trackers", "NO_TRACKERS"}, {"analytics", "NO_TIKTOK_ANALYTICS"}, {"comment translation", "AUTO_TRANSLATE"}, {"downloads", "NO_WATERMARK"}, {"clean links", "CLEAN_LINKS"},
@@ -2754,7 +2755,7 @@ public final class ModSettingsActivity extends Activity {
             Prefs.UNMUTE, Prefs.SELF_REPOST, Prefs.HD_UPLOAD, Prefs.GHOST_ONLINE, Prefs.GHOST_READ,
             Prefs.COMMENT_PHOTOS, Prefs.NO_HASHTAG_LIMIT, Prefs.CAMERA_EXTRAS, Prefs.HIDE_ROOT, Prefs.PIP_FEED,
             Prefs.PREFER_H264, Prefs.PHOTO_BEST, Prefs.NO_MOTION_SENSORS, Prefs.NO_TIKTOK_ANALYTICS, Prefs.UPLOAD_ORIGINAL,
-            Prefs.FEED_REGION_OWN, Prefs.KEEP_UNSENT, Prefs.NO_DOUBLE_TAP_LIKE, Prefs.ACCOUNT_DATE, Prefs.LIVE_RECORD, Prefs.COMMENT_NO_LIMIT, Prefs.CLASSIC_EMOJI, Prefs.OFFLINE_MORE};
+            Prefs.FEED_REGION_OWN, Prefs.KEEP_UNSENT, Prefs.NO_DOUBLE_TAP_LIKE, Prefs.ACCOUNT_DATE, Prefs.LIVE_RECORD, Prefs.COMMENT_NO_LIMIT, Prefs.CLASSIC_EMOJI, Prefs.OFFLINE_MORE, Prefs.BACKGROUND_PLAY};
 
     /**
      * A small mark after a row's title: an outlined "Beta" for settings under test, a plain

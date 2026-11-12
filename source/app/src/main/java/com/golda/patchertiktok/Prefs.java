@@ -25,6 +25,8 @@ final class Prefs {
     static final String AUTO_SCROLL = "auto_scroll_everywhere";
     /** Auto-scroll in a person's videos (profile, liked list), switched on its own in the long-press menu. */
     static final String AUTO_SCROLL_PROFILES = "auto_scroll_profiles";
+    /** Feed videos keep playing with the screen off or TikTok in the background. */
+    static final String BACKGROUND_PLAY = "background_play";
     static final String COMMENT_MEDIA = "comment_media_save";
     /** Favourite sticker sent by auto streaks instead of the flame; empty for the flame. */
     static final String STREAK_STICKER = "auto_streak_sticker_id";
@@ -193,6 +195,7 @@ final class Prefs {
         DEFAULTS.put(QUALITY_PICKER, false);
         DEFAULTS.put(AUTO_SCROLL, false);
         DEFAULTS.put(AUTO_SCROLL_PROFILES, false);
+        DEFAULTS.put(BACKGROUND_PLAY, false);
         DEFAULTS.put(COMMENT_MEDIA, true);
         DEFAULTS.put(SAVE_ALL_PHOTOS, false);
         DEFAULTS.put(COMMENT_REPOSTS, true);

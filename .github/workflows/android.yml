@@ -7,6 +7,9 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -51,3 +54,20 @@ jobs:
         with:
           name: app-release
           path: source/app/build/outputs/apk/release/app-release.apk
+
+      # Every push to main with a new versionName becomes a GitHub release with the APK attached.
+      - name: Publish release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts | head -1)
+          TAG="v${VERSION}"
+          APK="TiktokPatchXposed-${VERSION}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$APK"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists, replacing its APK"
+            gh release upload "$TAG" "$APK" --clobber
+          else
+            gh release create "$TAG" "$APK" --title "TiktokPatchXposed $VERSION" --notes-file ../docs/release-notes.md --target "$GITHUB_SHA"
+          fi

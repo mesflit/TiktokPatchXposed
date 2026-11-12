@@ -31,6 +31,7 @@ final class Module {
             run("remember clear display", () -> CleanScreen.install(loader));
             run("resume position", () -> ResumePosition.install(loader));
             run("auto-scroll", () -> AutoScroll.install(loader));
+            run("background play", () -> BackgroundPlay.install(loader));
             run("double tap like", () -> DoubleTapLike.install(loader));
             run("comment copy", () -> CommentCopy.install(loader));
             run("comment media", () -> CommentMedia.install(loader));
@@ -143,6 +144,7 @@ final class Module {
         run("startup ads", () -> StartupAds.install(loader));
         run("seekbar", () -> Seekbar.install(loader));
         run("foreground", () -> Foreground.install(app));
+        run("background play", () -> BackgroundPlay.attach(app));
         run("settings row", () -> SettingsEntry.install(app, loader));
         run("auto streaks", () -> AutoStreakManager.install(app, loader));
         run("code index release", Discovery::release);

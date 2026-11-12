@@ -14,8 +14,10 @@ import java.util.List;
  */
 final class Foreground {
     private static final List<Runnable> LISTENERS = new ArrayList<>();
+    private static final List<Runnable> AWAY = new ArrayList<>();
     private static boolean installed;
     private static int started;
+    private static java.lang.ref.WeakReference<Activity> last = new java.lang.ref.WeakReference<>(null);
 
     private Foreground() { }
 
@@ -29,7 +31,11 @@ final class Foreground {
             }
 
             @Override public void onActivityStopped(Activity activity) {
-                if (started > 0) started--;
+                if (started > 0 && --started == 0) {
+                    last = new java.lang.ref.WeakReference<>(activity);
+                    // Before TikTok's fragments stop: the activity's callbacks come first.
+                    for (Runnable listener : AWAY) Safe.run("background", listener).run();
+                }
             }
 
             @Override public void onActivityCreated(Activity activity, Bundle state) { }
@@ -48,5 +54,15 @@ final class Foreground {
     /** {@code listener} runs each time TikTok comes back to the screen. */
     static void listen(Runnable listener) {
         LISTENERS.add(listener);
+    }
+
+    /** The TikTok screen that stopped last, when TikTok was put away. */
+    static Activity lastShown() {
+        return last.get();
+    }
+
+    /** {@code listener} runs each time the last TikTok screen stops: TikTok was put away or the screen went off. */
+    static void listenAway(Runnable listener) {
+        AWAY.add(listener);
     }
 }
