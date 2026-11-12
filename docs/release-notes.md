@@ -1,4 +1,12 @@
-## 4.4.8 (fork)
+## 4.4.9 (fork)
+
+**Fix:** TikTok frees its video player about a second after it is put away, so background play stopped right away.
+While background play runs, that release is held back and made once TikTok is open again or the feed moves on.
+
+**Düzeltme:** TikTok arka plana atılınca yaklaşık bir saniye sonra oynatıcıyı tamamen kapatıyordu, bu yüzden video hemen duruyordu.
+Arka planda oynatırken bu kapatma erteleniyor; TikTok açılınca ya da sonraki videoya geçilince yapılıyor.
+
+## 4.4.8
 
 Diagnostics: the bug report traces background play step by step (player position, engine state, each move), to find why auto-scroll stops in the background.
 

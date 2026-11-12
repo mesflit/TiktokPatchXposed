@@ -83,6 +83,73 @@ final class BackgroundPlay {
     static void moving() {
         movingUntil = SystemClock.uptimeMillis() + MOVE_MS;
         if (away) traceTicks = 10;
+        // The old video's engine was held on; now it may go.
+        flush();
+    }
+
+    /** Engine calls that end playback: TikTok frees the player when its screen stops. */
+    private static boolean ends(String name) {
+        return "stop".equals(name) || "release".equals(name) || "releaseAsync".equals(name) || "releaseSync".equals(name);
+    }
+
+    /** Calls held back while away, made once TikTok is back or the feed moves on. */
+    private static final java.util.List<Object[]> DEFERRED = new java.util.ArrayList<>();
+
+    private static void defer(Method method, Object target, Object[] args) {
+        synchronized (DEFERRED) {
+            DEFERRED.add(new Object[]{method, target, args.clone()});
+        }
+    }
+
+    /** Whether TikTok let go of the engine that plays: then its own player reports nothing useful. */
+    private static boolean detached() {
+        synchronized (DEFERRED) {
+            return !DEFERRED.isEmpty();
+        }
+    }
+
+    /** Makes the held-back calls now; the hooks let them through since this runs when not blocking. */
+    private static void flush() {
+        java.util.List<Object[]> calls;
+        synchronized (DEFERRED) {
+            if (DEFERRED.isEmpty()) return;
+            calls = new java.util.ArrayList<>(DEFERRED);
+            DEFERRED.clear();
+        }
+        for (Object[] call : calls) {
+            try {
+                ((Method) call[0]).invoke(call[1], (Object[]) call[2]);
+            } catch (Throwable error) {
+                Safe.log("background play release", error);
+            }
+        }
+        trace("made " + calls.size() + " held-back engine call(s)");
+    }
+
+    /** The first TikTok frames of the current call, for the log. */
+    private static String caller() {
+        StringBuilder out = new StringBuilder();
+        int shown = 0;
+        for (StackTraceElement frame : new Throwable().getStackTrace()) {
+            String type = frame.getClassName();
+            if (type.startsWith("com.golda.") || type.startsWith("java.") || type.startsWith("dalvik.")
+                    || type.startsWith("android.") || type.contains("xposed") || type.contains("lsposed") || type.startsWith("LSP")) continue;
+            out.append(shown == 0 ? " from " : " < ").append(type.substring(type.lastIndexOf('.') + 1)).append('.').append(frame.getMethodName());
+            if (++shown == 4) break;
+        }
+        return out.toString();
+    }
+
+    /**
+     * The position of the video that plays. Once TikTok let go of its player while away, the engine
+     * itself is asked; otherwise TikTok's player, through {@code fromPlayer}.
+     */
+    static Object position(Object fromPlayer) {
+        if (!away || !detached()) return fromPlayer;
+        Object current = engine.get();
+        Object value = Reflect.call(current, "getCurrentPlaybackTime");
+        if (!(value instanceof Number)) value = Reflect.call(current, "getCurrentPosition");
+        return value instanceof Number ? value : fromPlayer;
     }
 
     /** Hooks; each reads the switch on every call, so they go in before the settings load. */
@@ -121,6 +188,28 @@ final class BackgroundPlay {
                             if (!away || moving) engine = new WeakReference<>(param.thisObject);
                         }
                     })) hooks++;
+                } else if (ends(method.getName())) {
+                    if (Hooks.tryHook(method, new Hooks.Hook() {
+                        @Override protected void before(Hooks.Call param) {
+                            if (!away || param.thisObject != engine.get()) return;
+                            if (blocking()) {
+                                // TikTok frees its player once put away; this one keeps playing until TikTok is back.
+                                defer(method, param.thisObject, param.args);
+                                param.setResult(null);
+                                trace("engine " + method.getName() + " deferred" + caller());
+                            } else {
+                                trace("engine " + method.getName() + caller());
+                            }
+                        }
+                    })) hooks++;
+                } else if (method.getName().toLowerCase(Locale.ROOT).startsWith("setsurface") || "setDisplay".equals(method.getName())) {
+                    Hooks.tryHook(method, new Hooks.Hook() {
+                        @Override protected void before(Hooks.Call param) {
+                            if (away && param.thisObject == engine.get()) {
+                                trace("engine " + method.getName() + "(" + (param.args.length > 0 && param.args[0] == null ? "null" : "surface") + ")");
+                            }
+                        }
+                    });
                 } else if ("pause".equals(method.getName())) {
                     if (Hooks.tryHook(method, new Hooks.Hook() {
                         @Override protected void before(Hooks.Call param) {
@@ -287,6 +376,7 @@ final class BackgroundPlay {
     private static void stop() {
         away = false;
         userPaused = false;
+        flush();
         MAIN.removeCallbacks(WATCH);
         releaseLock();
         MAIN.post(Safe.run("media controls", MediaControls::hide));
@@ -405,7 +495,8 @@ final class BackgroundPlay {
                 Object current = engine.get();
                 trace("tick id=" + (aweme == null ? null : Reflect.get(aweme, "aid"))
                         + " pos=" + (tracedPanel == null ? null : Reflect.call(invoke(playerAbility, tracedPanel), "getCurrentPosition"))
-                        + " playing=" + playing() + " engine=" + (current == null ? "none" : Reflect.call(current, "getPlaybackState"))
+                        + " playing=" + playing() + " engine=" + (current == null ? "none" : Reflect.call(current, "getPlaybackState")
+                                + "/" + Reflect.call(current, "getCurrentPlaybackTime")) + (detached() ? " held" : "")
                         + (userPaused ? " userPaused" : ""));
             }
             if (userPaused) {
@@ -413,7 +504,7 @@ final class BackgroundPlay {
                 return;
             }
             Object feedPanel = panel.get();
-            Object value = feedPanel == null ? null : Reflect.call(invoke(playerAbility, feedPanel), "getCurrentPosition");
+            Object value = position(feedPanel == null ? null : Reflect.call(invoke(playerAbility, feedPanel), "getCurrentPosition"));
             if (value instanceof Number && SystemClock.uptimeMillis() >= movingUntil) {
                 long position = ((Number) value).longValue();
                 if (position == lastPosition) {
@@ -435,6 +526,12 @@ final class BackgroundPlay {
     static void resume() {
         Object feedPanel = panel.get();
         if (feedPanel == null) return;
+        Object held = engine.get();
+        if (detached() && held != null) {
+            Reflect.call(held, "play");
+            note("engine.play (held)");
+            return;
+        }
         if (resume(invoke(playerAbility, feedPanel), "ability")) return;
         if (resume(Reflect.call(feedPanel, "getPlayerManager"), "manager")) return;
         Object current = engine.get();

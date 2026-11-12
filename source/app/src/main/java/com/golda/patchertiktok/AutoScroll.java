@@ -502,7 +502,7 @@ final class AutoScroll {
                 if (background) started(feedPanel);
                 return;
             }
-            Object value = Reflect.call(invoke(playerAbility, feedPanel), "getCurrentPosition");
+            Object value = BackgroundPlay.position(Reflect.call(invoke(playerAbility, feedPanel), "getCurrentPosition"));
             if (value instanceof Number) {
                 long position = ((Number) value).longValue();
                 boolean done = limit > 0
