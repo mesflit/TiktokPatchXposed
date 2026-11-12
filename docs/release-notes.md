@@ -1,4 +1,22 @@
-## 4.5.1 (fork)
+## 4.6.0 (fork)
+
+**Background play, rebuilt.** TikTok frees its own player the moment its screen stops, and it could not be kept alive.
+Now, once TikTok is put away, the module plays the same video with a player of its own (its sound), from where TikTok was.
+
+- Auto-scroll in the background: when a video ends, TikTok's feed is moved on and the next video plays.
+- The notification shows the real state: play/pause, next, stop, progress and seeking; also on the lock screen and headset buttons.
+- Back in TikTok, its own player continues from where the sound was.
+- A call, another app's audio or headphones coming out pause it.
+
+**Arka planda oynatma yeniden yazıldı.** TikTok ekranı durur durmaz kendi oynatıcısını kapatıyor ve bu engellenemedi.
+Artık TikTok arka plana geçince modül aynı videoyu kendi oynatıcısıyla (sesini) TikTok'un kaldığı yerden çalıyor.
+
+- Arka planda otomatik kaydırma: video bitince akış ilerletilir ve sıradaki video çalar.
+- Bildirim gerçek durumu gösterir: oynat/duraklat, sonraki, durdur, ilerleme çubuğu; kilit ekranı ve kulaklık tuşları da.
+- TikTok'a dönünce kendi oynatıcısı sesin kaldığı yerden devam eder.
+- Arama, başka uygulamanın sesi ya da kulaklığın çıkması duraklatır.
+
+## 4.5.1
 
 **Fix attempt:** when the screen goes off, Android removes the video's surface and TikTok stops its player. The playing video is now moved to a hidden surface just before that, and TikTok is not told, so the video should keep playing.
 

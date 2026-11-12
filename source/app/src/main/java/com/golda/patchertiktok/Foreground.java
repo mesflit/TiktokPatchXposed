@@ -17,6 +17,7 @@ final class Foreground {
     private static final List<Runnable> AWAY = new ArrayList<>();
     private static boolean installed;
     private static int started;
+    private static long pausedAt;
     private static java.lang.ref.WeakReference<Activity> last = new java.lang.ref.WeakReference<>(null);
 
     private Foreground() { }
@@ -40,7 +41,9 @@ final class Foreground {
 
             @Override public void onActivityCreated(Activity activity, Bundle state) { }
             @Override public void onActivityResumed(Activity activity) { }
-            @Override public void onActivityPaused(Activity activity) { }
+            @Override public void onActivityPaused(Activity activity) {
+                pausedAt = android.os.SystemClock.uptimeMillis();
+            }
             @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) { }
             @Override public void onActivityDestroyed(Activity activity) { }
         });
@@ -54,6 +57,11 @@ final class Foreground {
     /** {@code listener} runs each time TikTok comes back to the screen. */
     static void listen(Runnable listener) {
         LISTENERS.add(listener);
+    }
+
+    /** When a TikTok screen was last paused, on the uptime clock. */
+    static long pausedAt() {
+        return pausedAt;
     }
 
     /** The TikTok screen that stopped last, when TikTok was put away. */

@@ -123,6 +123,19 @@ final class ResumePosition {
         return value instanceof Number ? ((Number) value).longValue() : 0L;
     }
 
+    /** Moves the feed's player to {@code position} of a video {@code duration} long. */
+    static boolean seekTo(Object feedPanel, long position, long duration) {
+        Object manager = Reflect.call(feedPanel, "getPlayerManager");
+        Method seek = seek(manager);
+        if (seek == null || duration <= 0) return false;
+        try {
+            seek.invoke(manager, position * 100f / duration);
+            return true;
+        } catch (Throwable error) {
+            return false;
+        }
+    }
+
     private static Method seek(Object manager) {
         if (manager == null) return null;
         try {

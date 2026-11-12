@@ -57,14 +57,6 @@ final class AutoScroll {
     private static WeakReference<Object> shown = new WeakReference<>(null);
     /** TikTok's own auto-scroll moved For You on in this session: its switch is on. */
     private static volatile boolean nativeForYou;
-    /** For You in the background: when its video was seen ending, so TikTok gets a moment to move first. */
-    private static long endedAt;
-    /** Ticks the position stood still near the end: in the background TikTok may not loop the video. */
-    private static int stuck;
-    /** What happened with auto-scroll in the background, for bug reports. */
-    private static void note(String what) {
-        BackgroundPlay.trace("auto-scroll: " + what + (playing == null ? "" : " [" + playing + "]"));
-    }
 
     private AutoScroll() { }
 
@@ -95,8 +87,7 @@ final class AutoScroll {
                 @Override protected void after(Hooks.Call param) {
                     shown = new WeakReference<>(param.thisObject);
                     // The panel is remembered even when off, so the switch can start right away.
-                    if (!recommended(param.thisObject) || BackgroundPlay.away()
-                            || nativeForYou && Prefs.on(Prefs.SKIP_PHOTOS)) started(param.thisObject);
+                    if (!recommended(param.thisObject) || nativeForYou && Prefs.on(Prefs.SKIP_PHOTOS)) started(param.thisObject);
                 }
             });
         }
@@ -138,7 +129,6 @@ final class AutoScroll {
                             return;
                         }
                         nativeForYou = true;
-                        BackgroundPlay.moving();
                     }
                 });
                 hooks++;
@@ -444,38 +434,63 @@ final class AutoScroll {
             if (photos > 0) limit = AutoScrollPolicy.photoTime(photos, PHOTO_MS, music);
             if (photos > 0 && Prefs.on(Prefs.SKIP_PHOTOS)) {
                 // Photo posts are passed over right away wherever the feed moves on by itself.
-                endedAt = 0;
                 MAIN.removeCallbacks(TICK);
                 MAIN.removeCallbacks(SKIP_PHOTO);
-                if (enabled(feedPanel) || recommended(feedPanel) && nativeForYou) MAIN.postDelayed(SKIP_PHOTO, 700L);
+                if (movesOn(feedPanel) || recommended(feedPanel) && nativeForYou) MAIN.postDelayed(SKIP_PHOTO, 700L);
                 return;
             }
         }
-        endedAt = 0;
-        stuck = 0;
         MAIN.removeCallbacks(TICK);
         MAIN.removeCallbacks(SKIP_PHOTO);
-        if (enabled(feedPanel) && (duration > 0 || limit > 0)) MAIN.postDelayed(TICK, TICK_MS);
+        if (movesOn(feedPanel) && (duration > 0 || limit > 0)) MAIN.postDelayed(TICK, TICK_MS);
     }
 
     /**
-     * Whether this feed moves on by itself. For You is TikTok's own; but while TikTok is put away
-     * its auto-scroll may stand still, so there this one takes over when TikTok's switch was seen
-     * working, or when auto-scroll everywhere is on.
+     * Whether this feed moves on by itself when a video ends. For You is TikTok's own; but while
+     * TikTok is put away its auto-scroll stands still, so there it counts as on when TikTok's
+     * switch was seen working, or when auto-scroll everywhere is on.
      */
-    private static boolean enabled(Object feedPanel) {
+    static boolean movesOn(Object feedPanel) {
         if (recommended(feedPanel)) return BackgroundPlay.away() && (nativeForYou || Prefs.on(Prefs.AUTO_SCROLL));
         return Prefs.on(key(feedPanel));
     }
 
-    /** Called when TikTok is put away with background play: the feed shown keeps its auto-scroll going. */
-    static void putAway() {
-        Object current = shown.get();
-        boolean on = current != null && enabled(current);
-        note("put away, feed=" + (current == null ? "none" : current.getClass().getSimpleName()) + " on=" + on
-                + " forYouNative=" + nativeForYou);
-        if (on) started(current);
+    /** Moves the feed to its next video; used by background play, where no screen shows it. */
+    static boolean advance(Object feedPanel) {
+        MAIN.removeCallbacks(TICK);
+        MAIN.removeCallbacks(SKIP_PHOTO);
+        last = -1;
+        return next(feedPanel, true);
     }
+
+    /** Moves past the photo post that is shown, as long as it still is; retried while a sheet covers it. */
+    private static final Runnable SKIP_PHOTO = new Runnable() {
+        private int tries;
+
+        @Override public void run() {
+            try {
+                Object feedPanel = panel.get();
+                String id = playing;
+                // Put away, background play passes photo posts over itself.
+                if (feedPanel == null || id == null || !Foreground.shown() || BackgroundPlay.away()) return;
+                Object aweme = invoke(currentAweme, feedPanel);
+                if (aweme == null || !id.equals(string(Reflect.get(aweme, "aid")))) {
+                    tries = 0;
+                    return;
+                }
+                if (next(feedPanel, false)) {
+                    tries = 0;
+                    last = -1;
+                } else if (++tries < 60) {
+                    MAIN.postDelayed(this, 1_000L);
+                } else {
+                    tries = 0;
+                }
+            } catch (Throwable error) {
+                Safe.log("skip photos", error);
+            }
+        }
+    };
 
     private static final Runnable TICK = new Runnable() {
         @Override public void run() {
@@ -489,139 +504,40 @@ final class AutoScroll {
         private void step() {
             Object feedPanel = panel.get();
             String id = playing;
-            boolean background = BackgroundPlay.away();
-            if (feedPanel == null || id == null || !enabled(feedPanel) || !(Foreground.shown() || background)) return;
+            // Put away, TikTok's player stands still; background play moves the feed on then.
+            if (feedPanel == null || id == null || !movesOn(feedPanel) || !Foreground.shown() || BackgroundPlay.away()) return;
             Object aweme = invoke(currentAweme, feedPanel);
-            String now = aweme == null ? null : string(Reflect.get(aweme, "aid"));
-            if (now == null) {
-                if (background) MAIN.postDelayed(this, TICK_MS);
-                return;
-            }
-            if (!id.equals(now)) {
-                // In the background the next video may never draw its first frame: follow it here.
-                if (background) started(feedPanel);
-                return;
-            }
-            Object value = BackgroundPlay.position(Reflect.call(invoke(playerAbility, feedPanel), "getCurrentPosition"));
+            if (aweme == null || !id.equals(string(Reflect.get(aweme, "aid")))) return;
+            Object value = Reflect.call(invoke(playerAbility, feedPanel), "getCurrentPosition");
             if (value instanceof Number) {
                 long position = ((Number) value).longValue();
                 boolean done = limit > 0
                         ? position >= limit || AutoScrollPolicy.looped(last, position, limit)
                         : AutoScrollPolicy.looped(last, position, duration);
-                // Put away, the player may stop at the end instead of looping.
-                stuck = background && position == last && AutoScrollPolicy.atEnd(position, limit > 0 ? limit : duration) ? stuck + 1 : 0;
-                if (!done && stuck >= 2) {
-                    done = true;
-                    note("video stopped at its end instead of looping");
-                }
-                if ((done || endedAt != 0) && background && recommended(feedPanel)) {
-                    // TikTok's own auto-scroll may still move For You; give it a moment first.
-                    long time = android.os.SystemClock.uptimeMillis();
-                    if (endedAt == 0) endedAt = time;
-                    done = time - endedAt >= 1_500L;
-                    if (!done) {
-                        MAIN.postDelayed(this, TICK_MS);
-                        return;
-                    }
-                }
-                if (done && next(feedPanel)) {
+                if (done && next(feedPanel, false)) {
                     last = -1;
-                    endedAt = 0;
-                    stuck = 0;
-                    if (background) {
-                        note("moved on");
-                        MAIN.postDelayed(FOLLOW, 1_500L);
-                    }
                     return;
                 }
-                if (done && background) note("could not move on");
                 last = position;
             }
             MAIN.postDelayed(this, TICK_MS);
         }
     };
 
-    /** Moves past the photo post that is shown, as long as it still is; retried while a sheet covers it. */
-    private static final Runnable SKIP_PHOTO = new Runnable() {
-        private int tries;
-
-        @Override public void run() {
-            try {
-                Object feedPanel = panel.get();
-                String id = playing;
-                if (feedPanel == null || id == null || !(Foreground.shown() || BackgroundPlay.away())) return;
-                Object aweme = invoke(currentAweme, feedPanel);
-                if (aweme == null || !id.equals(string(Reflect.get(aweme, "aid")))) {
-                    tries = 0;
-                    return;
-                }
-                if (next(feedPanel)) {
-                    tries = 0;
-                    last = -1;
-                    if (BackgroundPlay.away()) MAIN.postDelayed(FOLLOW, 1_500L);
-                } else if (++tries < 60) {
-                    MAIN.postDelayed(this, 1_000L);
-                } else {
-                    tries = 0;
-                }
-            } catch (Throwable error) {
-                Safe.log("skip photos", error);
-            }
-        }
-    };
-
-    /** The "next" button of the media controls: moves the feed that is shown on by one video. */
-    static void skip() {
-        Object feedPanel = shown.get();
-        if (feedPanel == null) return;
-        MAIN.removeCallbacks(TICK);
-        MAIN.removeCallbacks(SKIP_PHOTO);
-        if (next(feedPanel)) {
-            last = -1;
-            endedAt = 0;
-            MAIN.postDelayed(FOLLOW, 1_500L);
-        }
-    }
-
-    /** After moving on in the background: picks up the new video even if it draws no frame. */
-    private static final Runnable FOLLOW = () -> {
-        try {
-            Object feedPanel = shown.get();
-            // If its player does not start without a screen, background play starts it.
-            if (feedPanel != null && BackgroundPlay.away()) {
-                started(feedPanel);
-                note("following the next video");
-            }
-        } catch (Throwable error) {
-            Safe.log("auto-scroll", error);
-        }
-    };
-
-    private static boolean next(Object feedPanel) {
+    private static boolean next(Object feedPanel, boolean background) {
         Activity activity = activity(feedPanel);
-        boolean background = BackgroundPlay.away();
         if (activity == null || activity.isFinishing()) return false;
         // A comment sheet, share menu or dialog has the focus: the user is busy with this video.
         // Put away, nothing has the focus.
         if (!background && !activity.hasWindowFocus()) return false;
         Object view = invoke(pager, feedPanel);
-        if (view == null) {
-            if (background) note("no pager");
-            return false;
-        }
+        if (view == null) return false;
         Object current = Reflect.call(view, "getCurrentItem");
-        if (!(current instanceof Integer)) {
-            if (background) note("no current item");
-            return false;
-        }
+        if (!(current instanceof Integer)) return false;
         int target = (Integer) current + 1;
         Object adapter = Reflect.call(view, "getAdapter");
         Object count = adapter == null ? null : Reflect.call(adapter, "getCount");
-        if (count instanceof Integer && target >= (Integer) count) {
-            if (background) note("end of the list");
-            return false;
-        }
-        BackgroundPlay.moving();
+        if (count instanceof Integer && target >= (Integer) count) return false;
         try {
             // With no screen there are no frames, so a smooth scroll would never finish.
             view.getClass().getMethod("setCurrentItem", int.class, boolean.class).invoke(view, target, !background);
