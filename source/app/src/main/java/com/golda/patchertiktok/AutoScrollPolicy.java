@@ -11,6 +11,11 @@ final class AutoScrollPolicy {
         return before >= length - tail && now < before && now <= 1_500L;
     }
 
+    /** The position is in the last moments of the video. */
+    static boolean atEnd(long position, long length) {
+        return length > 0 && position > 0 && position >= length - Math.max(800L, Math.min(2_000L, length / 10));
+    }
+
     /**
      * How long a photo post stays: a few seconds per photo, at least five seconds in all, and no
      * longer than its music when the music length is known.

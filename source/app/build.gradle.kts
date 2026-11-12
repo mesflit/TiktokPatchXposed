@@ -10,8 +10,8 @@ android {
         applicationId = "com.golda.patchertiktok"
         minSdk = 27
         targetSdk = 36
-        versionCode = 55
-        versionName = "4.4.6"
+        versionCode = 56
+        versionName = "4.4.7"
     }
     buildFeatures {
         buildConfig = true

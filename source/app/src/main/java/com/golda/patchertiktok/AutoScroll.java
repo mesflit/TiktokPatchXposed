@@ -59,6 +59,14 @@ final class AutoScroll {
     private static volatile boolean nativeForYou;
     /** For You in the background: when its video was seen ending, so TikTok gets a moment to move first. */
     private static long endedAt;
+    /** Ticks the position stood still near the end: in the background TikTok may not loop the video. */
+    private static int stuck;
+    /** What happened with auto-scroll in the background, written to the log once per kind. */
+    private static final java.util.Set<String> NOTED = java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+
+    private static void note(String what) {
+        if (NOTED.add(what)) RuntimeLog.log("auto-scroll background: " + what);
+    }
 
     private AutoScroll() { }
 
@@ -446,6 +454,7 @@ final class AutoScroll {
             }
         }
         endedAt = 0;
+        stuck = 0;
         MAIN.removeCallbacks(TICK);
         MAIN.removeCallbacks(SKIP_PHOTO);
         if (enabled(feedPanel) && (duration > 0 || limit > 0)) MAIN.postDelayed(TICK, TICK_MS);
@@ -464,7 +473,10 @@ final class AutoScroll {
     /** Called when TikTok is put away with background play: the feed shown keeps its auto-scroll going. */
     static void putAway() {
         Object current = shown.get();
-        if (current != null && enabled(current)) started(current);
+        boolean on = current != null && enabled(current);
+        note("put away, feed=" + (current == null ? "none" : current.getClass().getSimpleName()) + " on=" + on
+                + " forYouNative=" + nativeForYou);
+        if (on) started(current);
     }
 
     private static final Runnable TICK = new Runnable() {
@@ -498,6 +510,12 @@ final class AutoScroll {
                 boolean done = limit > 0
                         ? position >= limit || AutoScrollPolicy.looped(last, position, limit)
                         : AutoScrollPolicy.looped(last, position, duration);
+                // Put away, the player may stop at the end instead of looping.
+                stuck = background && position == last && AutoScrollPolicy.atEnd(position, limit > 0 ? limit : duration) ? stuck + 1 : 0;
+                if (!done && stuck >= 2) {
+                    done = true;
+                    note("video stopped at its end instead of looping");
+                }
                 if ((done || endedAt != 0) && background && recommended(feedPanel)) {
                     // TikTok's own auto-scroll may still move For You; give it a moment first.
                     long time = android.os.SystemClock.uptimeMillis();
@@ -511,9 +529,14 @@ final class AutoScroll {
                 if (done && next(feedPanel)) {
                     last = -1;
                     endedAt = 0;
-                    if (background) MAIN.postDelayed(FOLLOW, 1_500L);
+                    stuck = 0;
+                    if (background) {
+                        note("moved on");
+                        MAIN.postDelayed(FOLLOW, 1_500L);
+                    }
                     return;
                 }
+                if (done && background) note("could not move on");
                 last = position;
             }
             MAIN.postDelayed(this, TICK_MS);
@@ -581,13 +604,22 @@ final class AutoScroll {
         // Put away, nothing has the focus.
         if (!background && !activity.hasWindowFocus()) return false;
         Object view = invoke(pager, feedPanel);
-        if (view == null) return false;
+        if (view == null) {
+            if (background) note("no pager");
+            return false;
+        }
         Object current = Reflect.call(view, "getCurrentItem");
-        if (!(current instanceof Integer)) return false;
+        if (!(current instanceof Integer)) {
+            if (background) note("no current item");
+            return false;
+        }
         int target = (Integer) current + 1;
         Object adapter = Reflect.call(view, "getAdapter");
         Object count = adapter == null ? null : Reflect.call(adapter, "getCount");
-        if (count instanceof Integer && target >= (Integer) count) return false;
+        if (count instanceof Integer && target >= (Integer) count) {
+            if (background) note("end of the list");
+            return false;
+        }
         BackgroundPlay.moving();
         try {
             // With no screen there are no frames, so a smooth scroll would never finish.

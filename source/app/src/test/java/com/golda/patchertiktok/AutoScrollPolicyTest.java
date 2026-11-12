@@ -27,4 +27,12 @@ public class AutoScrollPolicyTest {
         org.junit.Assert.assertEquals(5_000L, AutoScrollPolicy.photoTime(1, 3_000L, 0L));
         org.junit.Assert.assertEquals(30_000L, AutoScrollPolicy.photoTime(35, 3_000L, 30_000L));
     }
+
+    @Test
+    public void stoppedAtTheEnd() {
+        org.junit.Assert.assertTrue(AutoScrollPolicy.atEnd(14_500L, 15_000L));
+        org.junit.Assert.assertFalse(AutoScrollPolicy.atEnd(9_000L, 15_000L));
+        org.junit.Assert.assertFalse(AutoScrollPolicy.atEnd(0L, 15_000L));
+        org.junit.Assert.assertFalse(AutoScrollPolicy.atEnd(500L, 0L));
+    }
 }

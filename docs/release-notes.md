@@ -1,4 +1,12 @@
-## 4.4.6 (fork)
+## 4.4.7 (fork)
+
+**Fix:** auto-scroll in the background also moves on when TikTok stops a video at its end instead of looping it.
+The bug report (Settings → More → Bug report) now shows what auto-scroll did in the background.
+
+**Düzeltme:** arka planda TikTok videoyu döngüye almak yerine sonunda durdurursa otomatik kaydırma yine de geçer.
+Hata raporu artık arka planda otomatik kaydırmanın ne yaptığını gösteriyor.
+
+## 4.4.6
 
 **New: Media controls** — while background play runs, a notification with play/pause, next and stop.
 The same controls work on the lock screen and with headset buttons. Can be turned off under Playback → *Media controls*.
