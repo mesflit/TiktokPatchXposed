@@ -552,6 +552,80 @@ final class AutoScroll {
         }
     }
 
+    /** The feed's pager, its position and its number of videos; null when not readable. */
+    private static int[] place(Object feedPanel) {
+        Object view = invoke(pager, feedPanel);
+        Object current = view == null ? null : Reflect.call(view, "getCurrentItem");
+        Object adapter = view == null ? null : Reflect.call(view, "getAdapter");
+        Object count = adapter == null ? null : Reflect.call(adapter, "getCount");
+        if (!(current instanceof Integer) || !(count instanceof Integer)) return null;
+        return new int[]{(Integer) current, (Integer) count};
+    }
+
+    /** How many videos the feed has after the one shown; -1 when not readable. */
+    static int remaining(Object feedPanel) {
+        int[] place = place(feedPanel);
+        return place == null ? -1 : place[1] - place[0] - 1;
+    }
+
+    /** The adapter's list of videos, found once by its contents: a list as long as the feed holding the shown video. */
+    private static java.lang.reflect.Field items;
+
+    /** The video {@code ahead} places after the one shown, or null; lets background play load it early. */
+    static Object upcoming(Object feedPanel, int ahead) {
+        Object view = invoke(pager, feedPanel);
+        Object adapter = view == null ? null : Reflect.call(view, "getAdapter");
+        int[] place = place(feedPanel);
+        Object shownVideo = invoke(currentAweme, feedPanel);
+        if (adapter == null || place == null || shownVideo == null) return null;
+        int index = place[0] + ahead;
+        if (index >= place[1]) return null;
+        try {
+            if (items == null || !items.getDeclaringClass().isInstance(adapter)) items = findItems(adapter, shownVideo, place[0]);
+            Object list = items == null ? null : items.get(adapter);
+            if (!(list instanceof java.util.List) || index >= ((java.util.List<?>) list).size()) return null;
+            Object video = ((java.util.List<?>) list).get(index);
+            return video != null && video.getClass() == shownVideo.getClass() ? video : null;
+        } catch (Throwable error) {
+            return null;
+        }
+    }
+
+    private static java.lang.reflect.Field findItems(Object adapter, Object shownVideo, int index) throws IllegalAccessException {
+        for (Class<?> type = adapter.getClass(); type != null && type != Object.class; type = type.getSuperclass()) {
+            for (java.lang.reflect.Field field : type.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || !java.util.List.class.isAssignableFrom(field.getType())) continue;
+                field.setAccessible(true);
+                Object list = field.get(adapter);
+                if (list instanceof java.util.List && index < ((java.util.List<?>) list).size()
+                        && ((java.util.List<?>) list).get(index) == shownVideo) {
+                    return field;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Asks the feed for more videos, where it offers a way to; true if something was asked. */
+    static boolean loadMore(Object feedPanel) {
+        boolean asked = false;
+        for (Class<?> type = feedPanel.getClass(); type != null && type != Object.class; type = type.getSuperclass()) {
+            for (Method method : Reflect.methods(type)) {
+                String name = method.getName().toLowerCase(java.util.Locale.ROOT);
+                if (method.getParameterTypes().length != 0 || !(name.contains("loadmore") || name.contains("preload"))
+                        || java.lang.reflect.Modifier.isAbstract(method.getModifiers())) continue;
+                try {
+                    method.setAccessible(true);
+                    method.invoke(feedPanel);
+                    asked = true;
+                } catch (Throwable ignored) {
+                    // The next one.
+                }
+            }
+        }
+        return asked;
+    }
+
     private static Activity activity(Object feedPanel) {
         Object value = Reflect.call(feedPanel, "getActivity");
         if (!(value instanceof Activity)) value = Reflect.get(feedPanel, "activity");

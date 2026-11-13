@@ -1,4 +1,18 @@
-## 4.6.0 (fork)
+## 4.6.1 (fork)
+
+Background play with the screen off, more reliable:
+- The next video is loaded while the current one plays, so it starts at once.
+- Wi-Fi is kept at full speed with the screen off; loading no longer stalls for half a minute.
+- At the end of the feed the current video loops while more videos are asked for, instead of stopping.
+- A video address that does not answer in 12 seconds is replaced by the next one.
+
+Ekran kapalıyken arka planda oynatma daha güvenilir:
+- Sıradaki video, şu anki çalarken önceden yükleniyor; hemen başlıyor.
+- Ekran kapalıyken Wi‑Fi tam hızda tutuluyor; yükleme artık yarım dakika takılmıyor.
+- Akışın sonunda video durmak yerine döngüde çalıyor, bu sırada yeni videolar isteniyor.
+- 12 saniyede cevap vermeyen video adresi yerine sıradaki deneniyor.
+
+## 4.6.0
 
 **Background play, rebuilt.** TikTok frees its own player the moment its screen stops, and it could not be kept alive.
 Now, once TikTok is put away, the module plays the same video with a player of its own (its sound), from where TikTok was.

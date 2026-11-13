@@ -58,12 +58,24 @@ final class BackgroundPlay {
     private static Method currentAweme;
     private static WeakReference<Object> panel = new WeakReference<>(null);
     private static PowerManager.WakeLock lock;
+    /** Keeps Wi-Fi at full speed with the screen off; phones otherwise let it doze and loading stalls. */
+    private static android.net.wifi.WifiManager.WifiLock wifi;
     private static AudioManager audio;
 
     /** In TikTok: where its video was last seen, and when it last moved. */
     private static long seenPosition = -1;
     private static long seenAt;
     private static long movedAt;
+
+    /** The next video, loaded while the current one plays, so it starts at once. */
+    private static MediaPlayer nextPlayer;
+    private static String nextId;
+    private static boolean nextReady;
+    private static List<String> nextAddresses;
+    /** The feed had no next video: the current one loops while more are asked for. */
+    private static boolean waitingMore;
+    private static long waitingSince;
+    private static long askedAt;
 
     /** The module's own player and what it plays. */
     private static MediaPlayer player;
@@ -151,6 +163,18 @@ final class BackgroundPlay {
         if (power != null && app.checkSelfPermission(android.Manifest.permission.WAKE_LOCK) == PackageManager.PERMISSION_GRANTED) {
             lock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TiktokPatchXposed:background");
             lock.setReferenceCounted(false);
+            try {
+                android.net.wifi.WifiManager manager = (android.net.wifi.WifiManager) app.getApplicationContext()
+                        .getSystemService(Context.WIFI_SERVICE);
+                if (manager != null) {
+                    wifi = manager.createWifiLock(Build.VERSION.SDK_INT >= 29
+                            ? android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+                            : android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "TiktokPatchXposed:background");
+                    wifi.setReferenceCounted(false);
+                }
+            } catch (Throwable error) {
+                Safe.log("background play wifi lock", error);
+            }
         }
         MediaControls.attach(app, new MediaControls.Player() {
             @Override public void play() { userPlay(); }
@@ -227,6 +251,7 @@ final class BackgroundPlay {
         away = true;
         userPaused = false;
         interrupted = false;
+        waitingMore = false;
         failures = 0;
         skips = 0;
         pendingId = null;
@@ -286,7 +311,9 @@ final class BackgroundPlay {
     private static void endSession() {
         away = false;
         generation++;
+        waitingMore = false;
         releasePlayer();
+        dropNext();
         aweme = null;
         playingId = null;
         MAIN.removeCallbacks(WATCH);
@@ -341,12 +368,66 @@ final class BackgroundPlay {
         addresses = found;
         addressIndex = 0;
         startAt = position;
+        if (nextPlayer != null && playingId != null && playingId.equals(nextId)) {
+            // Loaded already while the last video played.
+            releasePlayer();
+            generation++;
+            player = nextPlayer;
+            prepared = nextReady;
+            openedAt = SystemClock.elapsedRealtime();
+            if (nextAddresses != null) addresses = nextAddresses;
+            nextPlayer = null;
+            nextId = null;
+            trace("starting " + playingId + (prepared ? " (loaded ahead)" : " (still loading ahead)"));
+            if (prepared) onPrepared(player);
+            else publish();
+            return;
+        }
+        dropNext();
         open();
+    }
+
+    /** Loads the feed's next video into a second player, so the move to it is instant and needs no network then. */
+    private static void prefetch() {
+        Object feedPanel = panel.get();
+        if (!away || feedPanel == null || !AutoScroll.movesOn(feedPanel)) return;
+        Object upcoming = AutoScroll.upcoming(feedPanel, 1);
+        String id = id(upcoming);
+        if (upcoming == null || id == null || id.equals(nextId)) return;
+        List<String> found = videoAddresses(upcoming);
+        if (found.isEmpty()) return;
+        dropNext();
+        nextId = id;
+        nextAddresses = found;
+        nextReady = false;
+        nextPlayer = create(found.get(0));
+        if (nextPlayer == null) nextId = null;
+        else trace("loading ahead " + id);
+    }
+
+    private static void dropNext() {
+        MediaPlayer old = nextPlayer;
+        nextPlayer = null;
+        nextId = null;
+        nextReady = false;
+        if (old != null) {
+            try {
+                old.reset();
+                old.release();
+            } catch (Throwable ignored) { }
+        }
     }
 
     /** Addresses of the video, the smallest file first: without a screen only its sound matters. */
     private static List<String> videoAddresses(Object shown) {
         List<String> out = new ArrayList<>();
+        // The address TikTok itself plays is the one its servers have ready; it loads fastest.
+        Object main = Reflect.get(Reflect.call(Reflect.call(shown, "getVideo"), "getPlayAddr"), "urlList");
+        if (main instanceof List) {
+            for (Object url : (List<?>) main) {
+                if (url instanceof String && ((String) url).startsWith("http") && out.size() < 2) out.add((String) url);
+            }
+        }
         List<DownloadModels.Item> items = DownloadModels.videos(shown);
         for (int i = items.size() - 1; i >= 0 && out.size() < 6; i--) {
             List<String> urls = items.get(i).urls;
@@ -357,41 +438,81 @@ final class BackgroundPlay {
 
     private static void open() {
         releasePlayer();
-        int mine = ++generation;
-        MediaPlayer created = new MediaPlayer();
-        player = created;
+        generation++;
         prepared = false;
-        openedAt = SystemClock.uptimeMillis();
-        try {
-            created.setAudioAttributes(new AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MOVIE).build());
-            Map<String, String> headers = new HashMap<>();
-            headers.put("User-Agent", "Mozilla/5.0");
-            created.setDataSource(app, Uri.parse(addresses.get(addressIndex)), headers);
-            created.setOnPreparedListener(ready -> guarded(mine, () -> onPrepared(ready)));
-            created.setOnCompletionListener(done -> guarded(mine, BackgroundPlay::ended));
-            created.setOnSeekCompleteListener(done -> guarded(mine, BackgroundPlay::publish));
-            created.setOnErrorListener((failed, what, extra) -> {
-                guarded(mine, () -> failed("player error " + what + "/" + extra));
-                return true;
-            });
-            created.prepareAsync();
-            trace("opening " + playingId + " (address " + (addressIndex + 1) + " of " + addresses.size() + ")");
-        } catch (Throwable error) {
-            failed("could not open: " + error);
+        openedAt = SystemClock.elapsedRealtime();
+        player = create(addresses.get(addressIndex));
+        if (player == null) {
+            failed("could not open");
             return;
         }
+        trace("opening " + playingId + " (address " + (addressIndex + 1) + " of " + addresses.size() + ")");
         publish();
     }
 
-    /** Runs a player callback, unless it belongs to a video that is no longer the current one. */
-    private static void guarded(int mine, Runnable task) {
-        if (mine != generation || !away) return;
+    /**
+     * A player loading {@code url}. Its callbacks act only while it is the current player (or, for
+     * the one loading ahead, the next one), so a replaced player can never touch the state.
+     */
+    private static MediaPlayer create(String url) {
+        MediaPlayer created = new MediaPlayer();
+        try {
+            created.setAudioAttributes(new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MOVIE).build());
+            // Keeps the processor awake while it plays, even if the session's own lock was taken away.
+            if (app.checkSelfPermission(android.Manifest.permission.WAKE_LOCK) == PackageManager.PERMISSION_GRANTED) {
+                created.setWakeMode(app, PowerManager.PARTIAL_WAKE_LOCK);
+            }
+            Map<String, String> headers = new HashMap<>();
+            headers.put("User-Agent", "Mozilla/5.0");
+            created.setDataSource(app, Uri.parse(url), headers);
+            created.setOnPreparedListener(ready -> guarded(() -> {
+                if (ready == player) onPrepared(ready);
+                else if (ready == nextPlayer) {
+                    nextReady = true;
+                    trace("loaded ahead " + nextId);
+                }
+            }));
+            created.setOnCompletionListener(done -> guarded(() -> {
+                if (done == player) ended();
+            }));
+            created.setOnSeekCompleteListener(done -> guarded(() -> {
+                if (done == player) publish();
+            }));
+            created.setOnErrorListener((failed, what, extra) -> {
+                guarded(() -> {
+                    if (failed == player) failed("player error " + what + "/" + extra);
+                    else if (failed == nextPlayer) {
+                        trace("loading ahead failed " + what + "/" + extra);
+                        dropNext();
+                    }
+                });
+                return true;
+            });
+            created.prepareAsync();
+            return created;
+        } catch (Throwable error) {
+            trace("could not open: " + error);
+            try {
+                created.release();
+            } catch (Throwable ignored) { }
+            return null;
+        }
+    }
+
+    /** Runs a player callback while background play runs. */
+    private static void guarded(Runnable task) {
+        if (!away) return;
         try {
             task.run();
         } catch (Throwable error) {
             Safe.log("background play", error);
         }
+    }
+
+    private static void guarded(int mine, Runnable task) {
+        if (mine != generation) return;
+        guarded(task);
     }
 
     private static void onPrepared(MediaPlayer ready) {
@@ -402,16 +523,20 @@ final class BackgroundPlay {
         if (startAt > 1_000L && (length <= 0 || startAt < length - 1_500L)) ready.seekTo(startAt, MediaPlayer.SEEK_CLOSEST);
         startAt = 0;
         if (!userPaused && !interrupted) ready.start();
-        trace("playing " + playingId + ", length " + length);
+        trace("playing " + playingId + ", length " + length + " after " + (SystemClock.elapsedRealtime() - openedAt) + " ms");
         publish();
+        MAIN.postDelayed(Safe.run("background prefetch", BackgroundPlay::prefetch), 1_500L);
     }
 
     /** The video played to its end: the feed moves on if it does so by itself, otherwise it loops like in TikTok. */
     private static void ended() {
         Object feedPanel = panel.get();
-        if (feedPanel != null && AutoScroll.movesOn(feedPanel)) {
+        if (feedPanel != null && AutoScroll.movesOn(feedPanel) && AutoScroll.remaining(feedPanel) != 0) {
             advance();
-        } else if (player != null && prepared) {
+            return;
+        }
+        if (feedPanel != null && AutoScroll.movesOn(feedPanel)) waitForMore(feedPanel);
+        if (player != null && prepared) {
             player.seekTo(0);
             player.start();
             publish();
@@ -434,9 +559,31 @@ final class BackgroundPlay {
         }
     }
 
+    /**
+     * The feed has no next video yet. TikTok loads more as one scrolls, and in the background it
+     * may load late; the current video loops meanwhile and the watch moves on once more arrived.
+     */
+    private static void waitForMore(Object feedPanel) {
+        if (!waitingMore) {
+            waitingMore = true;
+            waitingSince = SystemClock.elapsedRealtime();
+            askedAt = waitingSince;
+            trace("end of the feed, waiting for more" + (AutoScroll.loadMore(feedPanel) ? " (asked)" : ""));
+        }
+    }
+
     /** Moves TikTok's feed to its next video and plays that one. */
     private static void advance() {
         Object feedPanel = panel.get();
+        if (feedPanel != null && AutoScroll.remaining(feedPanel) == 0) {
+            waitForMore(feedPanel);
+            // Nothing to move to: keep the current video, or play it again if it ended.
+            if (player == null) startCurrent(0);
+            else if (prepared && !playingNow() && !userPaused) player.start();
+            publish();
+            return;
+        }
+        waitingMore = false;
         String before = feedPanel == null ? null : id(invoke(currentAweme, feedPanel));
         releasePlayer();
         int mine = ++generation;
@@ -583,8 +730,16 @@ final class BackgroundPlay {
             }
             if (inCall()) {
                 interrupt();
-            } else if (player != null && !prepared && SystemClock.uptimeMillis() - openedAt > 20_000L) {
-                failed("no answer from the address");
+            } else if (waitingMore && panel.get() != null && AutoScroll.remaining(panel.get()) > 0) {
+                trace("more videos arrived after " + (SystemClock.elapsedRealtime() - waitingSince) + " ms");
+                waitingMore = false;
+                // Moves on when the looping video ends.
+            } else if (waitingMore && SystemClock.elapsedRealtime() - askedAt > 20_000L && panel.get() != null) {
+                // Asks again now and then; the network may have been asleep the last time.
+                askedAt = SystemClock.elapsedRealtime();
+                AutoScroll.loadMore(panel.get());
+            } else if (player != null && !prepared && SystemClock.elapsedRealtime() - openedAt > 12_000L) {
+                failed("no answer from the address after 12 s");
             } else if (photoLimit > 0 && playingNow() && position() >= photoLimit) {
                 Object feedPanel = panel.get();
                 if (feedPanel != null && AutoScroll.movesOn(feedPanel)) advance();
@@ -685,20 +840,19 @@ final class BackgroundPlay {
     }
 
     private static void holdLock() {
-        if (lock == null) return;
         try {
-            lock.acquire(LOCK_MS);
+            if (lock != null) lock.acquire(LOCK_MS);
+            if (wifi != null && !wifi.isHeld()) wifi.acquire();
         } catch (Throwable error) {
             Safe.log("background play wake lock", error);
         }
     }
 
     private static void releaseLock() {
-        if (lock != null && lock.isHeld()) {
-            try {
-                lock.release();
-            } catch (Throwable ignored) { }
-        }
+        try {
+            if (lock != null && lock.isHeld()) lock.release();
+            if (wifi != null && wifi.isHeld()) wifi.release();
+        } catch (Throwable ignored) { }
     }
 
     private static String id(Object shown) {
