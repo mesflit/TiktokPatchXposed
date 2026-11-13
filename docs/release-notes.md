@@ -1,4 +1,10 @@
-## 4.6.5 (fork)
+## 4.6.6 (fork)
+
+- More → Source code opens this fork (mesflit/TiktokPatchXposed); a new row links the original project.
+
+- Daha fazla → Kaynak kodu artık bu fork'u (mesflit/TiktokPatchXposed) açıyor; yeni bir satır orijinal projeye gidiyor.
+
+## 4.6.5
 
 - In the background, TikTok now loads the next page of a feed (search, profiles) as it would when scrolling: the module sends the scroll events a swipe would.
 

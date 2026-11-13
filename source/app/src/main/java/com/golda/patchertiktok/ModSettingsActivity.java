@@ -48,7 +48,9 @@ import com.golda.patchertiktok.I18n.S;
 public final class ModSettingsActivity extends Activity {
     static final String EXTRA = "com.golda.patchertiktok.SETTINGS";
     static final String EXTRA_DARK = "com.golda.patchertiktok.DARK";
-    static final String SOURCE_URL = "https://github.com/hik0w/TiktokPatchXposed";
+    static final String SOURCE_URL = "https://github.com/mesflit/TiktokPatchXposed";
+    /** The project this fork is based on. */
+    static final String ORIGINAL_URL = "https://github.com/hik0w/TiktokPatchXposed";
 
     private final ArrayDeque<View> pages = new ArrayDeque<>();
     private final Runnable prefsListener = this::onPrefsChanged;
@@ -604,6 +606,11 @@ public final class ModSettingsActivity extends Activity {
         navigation(about, I18n.get(S.SOURCE_CODE), null, view -> {
             try {
                 startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(SOURCE_URL)));
+            } catch (RuntimeException ignored) { }
+        });
+        navigation(about, I18n.get(S.ORIGINAL_PROJECT), "hik0w", view -> {
+            try {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(ORIGINAL_URL)));
             } catch (RuntimeException ignored) { }
         });
         page.content.addView(new View(this), new LinearLayout.LayoutParams(-1, dp(12)));

@@ -7,7 +7,7 @@ LSPosed-модуль для TikTok. Убирает рекламу, даёт ск
 везде, свой цвет, шрифт и AMOLED-тему, скрытие элементов, флаги стран, невидимку и автоогоньки.
 Все настройки находятся прямо внутри TikTok.
 
-Текущая версия — **4.6.5**. Проверено на **TikTok 47.5.3**, **47.4.3** и **47.1.4** (Google Play и universal APK),
+Текущая версия — **4.6.6**. Проверено на **TikTok 47.5.3**, **47.4.3** и **47.1.4** (Google Play и universal APK),
 **Android 16**. Большинство функций сами находят нужные места в TikTok, поэтому
 переживают его обновления.
 
@@ -31,7 +31,7 @@ LSPosed-модуль для TikTok. Убирает рекламу, даёт ск
 **Что нужно:** Android 8.1 или новее, root и [LSPosed](https://github.com/JingMatrix/LSPosed)
 (libxposed 101–102 или старый LSPosed 1.9.x), TikTok из Google Play (`com.zhiliaoapp.musically`).
 
-1. Скачайте APK из последнего [релиза](https://github.com/hik0w/TiktokPatchXposed/releases/latest) и установите.
+1. Скачайте APK из последнего [релиза](https://github.com/mesflit/TiktokPatchXposed/releases/latest) и установите.
 2. В LSPosed включите модуль и отметьте TikTok.
 3. Принудительно остановите TikTok и откройте снова.
 
@@ -139,7 +139,7 @@ TikTok и почему что-то не нашлось). В «Ещё»: эксп
 - **Модуля нет в настройках TikTok** — проверьте, что модуль включён в LSPosed и TikTok отмечен,
   затем принудительно остановите TikTok.
 - **Функция пропала после обновления TikTok** — откройте «Состояние функций». Если там «Не нашлось
-  в этой версии TikTok», напишите в [issues](https://github.com/hik0w/TiktokPatchXposed/issues) с версией TikTok.
+  в этой версии TikTok», напишите в [issues](https://github.com/mesflit/TiktokPatchXposed/issues) с версией TikTok.
 - **TikTok показывает «Восстановите работу приложения»** — нажимайте **«Отмена»**: восстановление
   сбрасывает данные TikTok.
 - **Ограничения:** иконку TikTok поменять нельзя; часть элементов, нарисованных картинками, может

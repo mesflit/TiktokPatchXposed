@@ -7,7 +7,7 @@ turns on features TikTok rolls out only to some people, and adds many small thin
 everywhere, your own color, font and AMOLED theme, hiding parts of the screen, country flags,
 invisible mode and auto streaks. All settings live right inside TikTok.
 
-Current version: **4.6.5**. Tested on **TikTok 47.5.3**, **47.4.3** and **47.1.4** (Google Play and universal APK),
+Current version: **4.6.6**. Tested on **TikTok 47.5.3**, **47.4.3** and **47.1.4** (Google Play and universal APK),
 **Android 16**. Most features find what they need in TikTok by themselves, so
 they survive TikTok updates.
 
@@ -31,7 +31,7 @@ they survive TikTok updates.
 **You need:** Android 8.1 or newer, root and [LSPosed](https://github.com/JingMatrix/LSPosed)
 (libxposed 101–102 or the old LSPosed 1.9.x), TikTok from Google Play (`com.zhiliaoapp.musically`).
 
-1. Download the APK from the latest [release](https://github.com/hik0w/TiktokPatchXposed/releases/latest) and install it.
+1. Download the APK from the latest [release](https://github.com/mesflit/TiktokPatchXposed/releases/latest) and install it.
 2. Enable the module in LSPosed and tick TikTok.
 3. Force-stop TikTok and open it again.
 
@@ -139,7 +139,7 @@ after starting three times in a row, the module runs one launch in **safe mode**
 - **The module isn't in TikTok's settings**: check that the module is enabled in LSPosed with TikTok
   ticked, then force-stop TikTok.
 - **A feature stopped working after a TikTok update**: open "Feature status". If it says "Not found
-  in this TikTok version", open an [issue](https://github.com/hik0w/TiktokPatchXposed/issues) with your TikTok version.
+  in this TikTok version", open an [issue](https://github.com/mesflit/TiktokPatchXposed/issues) with your TikTok version.
 - **TikTok shows "Restore the app"**: tap **Cancel**; restoring resets TikTok's data.
 - **Limits:** the TikTok icon can't be changed; some elements drawn as pictures may keep TikTok's colors.
 </details>
