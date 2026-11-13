@@ -541,6 +541,7 @@ final class AutoScroll {
         try {
             // With no screen there are no frames, so a smooth scroll would never finish.
             view.getClass().getMethod("setCurrentItem", int.class, boolean.class).invoke(view, target, !background);
+            if (background) settle(view);
             return true;
         } catch (Throwable smooth) {
             try {
@@ -560,6 +561,97 @@ final class AutoScroll {
         Object count = adapter == null ? null : Reflect.call(adapter, "getCount");
         if (!(current instanceof Integer) || !(count instanceof Integer)) return null;
         return new int[]{(Integer) current, (Integer) count};
+    }
+
+    private static boolean settleNoted;
+
+    /**
+     * A jump without animation sends no scroll states, and TikTok loads the next page of a feed
+     * when a scroll settles near its end. So the states of a finished swipe are sent here: settling,
+     * then idle; through the pager's own setter, or straight to its listeners.
+     */
+    private static void settle(Object view) {
+        String how = null;
+        Method setter = null;
+        for (Class<?> type = view.getClass(); type != null && type != Object.class && setter == null; type = type.getSuperclass()) {
+            for (Method method : Reflect.methods(type)) {
+                if ("setScrollState".equals(method.getName()) && method.getParameterTypes().length == 1
+                        && method.getParameterTypes()[0] == int.class) {
+                    method.setAccessible(true);
+                    setter = method;
+                    break;
+                }
+            }
+        }
+        try {
+            if (setter != null) {
+                setter.invoke(view, 2);
+                setter.invoke(view, 0);
+                how = "setScrollState";
+            }
+        } catch (Throwable error) {
+            how = null;
+        }
+        if (how == null) {
+            int told = 0;
+            for (Object listener : pageListeners(view)) {
+                Method changed = intMethod(listener.getClass(), "onPageScrollStateChanged");
+                if (changed == null) continue;
+                try {
+                    changed.setAccessible(true);
+                    changed.invoke(listener, 2);
+                    changed.invoke(listener, 0);
+                    told++;
+                } catch (Throwable ignored) {
+                    // The next listener.
+                }
+            }
+            how = told + " listener(s)";
+        }
+        if (!settleNoted) {
+            settleNoted = true;
+            RuntimeLog.log("auto-scroll background: scroll states sent with " + how);
+        }
+    }
+
+    /** A method {@code name(int)} of {@code type} or its superclasses. */
+    private static Method intMethod(Class<?> type, String name) {
+        for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
+            try {
+                Method method = current.getDeclaredMethod(name, int.class);
+                method.setAccessible(true);
+                return method;
+            } catch (Throwable ignored) {
+                // The superclass.
+            }
+        }
+        return null;
+    }
+
+    /** The pager's page listeners: its listener fields and the lists of them. */
+    private static java.util.List<Object> pageListeners(Object view) {
+        java.util.List<Object> out = new java.util.ArrayList<>();
+        for (Class<?> type = view.getClass(); type != null && type != Object.class; type = type.getSuperclass()) {
+            for (java.lang.reflect.Field field : type.getDeclaredFields()) {
+                if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || field.getType().isPrimitive()) continue;
+                try {
+                    field.setAccessible(true);
+                    Object value = field.get(view);
+                    if (value instanceof java.util.List) {
+                        for (Object item : new java.util.ArrayList<>((java.util.List<?>) value)) {
+                            if (item != null && intMethod(item.getClass(), "onPageScrollStateChanged") != null
+                                    && !out.contains(item)) out.add(item);
+                        }
+                    } else if (value != null && !(value instanceof android.view.View)
+                            && intMethod(value.getClass(), "onPageScrollStateChanged") != null && !out.contains(value)) {
+                        out.add(value);
+                    }
+                } catch (Throwable ignored) {
+                    // The next field.
+                }
+            }
+        }
+        return out;
     }
 
     /** How many videos the feed has after the one shown; -1 when not readable. */
@@ -674,6 +766,7 @@ final class AutoScroll {
                     method.setAccessible(true);
                     method.invoke(feedPanel);
                     asked = true;
+                    BackgroundPlay.trace("asked the feed with " + type.getSimpleName() + "." + method.getName());
                 } catch (Throwable ignored) {
                     // The next one.
                 }

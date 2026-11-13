@@ -1,4 +1,10 @@
-## 4.6.4 (fork)
+## 4.6.5 (fork)
+
+- In the background, TikTok now loads the next page of a feed (search, profiles) as it would when scrolling: the module sends the scroll events a swipe would.
+
+- Arka planda TikTok artık akışın (arama, profil) sonraki sayfasını kaydırırken yaptığı gibi yüklüyor: modül bir kaydırmanın göndereceği olayları gönderiyor.
+
+## 4.6.4
 
 - Video servers the phone cannot find are tried last, so a video no longer hangs for 20+ seconds on them.
 - At the end of a list (a profile, a search) the last video no longer repeats forever: after 45 s without new videos it pauses and the notification says the list is over. If new videos arrive, it goes on by itself.
