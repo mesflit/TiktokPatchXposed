@@ -568,8 +568,12 @@ final class AutoScroll {
         return place == null ? -1 : place[1] - place[0] - 1;
     }
 
-    /** The adapter's list of videos, found once by its contents: a list as long as the feed holding the shown video. */
+    /** Where the feed keeps its videos, found once by contents: a list holding the shown video at its place. */
     private static java.lang.reflect.Field items;
+    private static boolean itemsOnPanel;
+    /** Or an adapter method that gives the video at a place. */
+    private static Method itemAt;
+    private static boolean lookupNoted;
 
     /** The video {@code ahead} places after the one shown, or null; lets background play load it early. */
     static Object upcoming(Object feedPanel, int ahead) {
@@ -580,30 +584,82 @@ final class AutoScroll {
         if (adapter == null || place == null || shownVideo == null) return null;
         int index = place[0] + ahead;
         if (index >= place[1]) return null;
+        String shownId = string(Reflect.get(shownVideo, "aid"));
         try {
-            if (items == null || !items.getDeclaringClass().isInstance(adapter)) items = findItems(adapter, shownVideo, place[0]);
-            Object list = items == null ? null : items.get(adapter);
-            if (!(list instanceof java.util.List) || index >= ((java.util.List<?>) list).size()) return null;
-            Object video = ((java.util.List<?>) list).get(index);
-            return video != null && video.getClass() == shownVideo.getClass() ? video : null;
+            if (items == null && itemAt == null) find(adapter, feedPanel, shownVideo, shownId, place[0]);
+            Object found = null;
+            if (items != null) {
+                Object list = items.get(itemsOnPanel ? feedPanel : adapter);
+                if (list instanceof java.util.List && index < ((java.util.List<?>) list).size()) found = ((java.util.List<?>) list).get(index);
+            } else if (itemAt != null) {
+                found = video(itemAt.invoke(adapter, index), shownVideo.getClass());
+            }
+            return found != null && found.getClass() == shownVideo.getClass() ? found : null;
         } catch (Throwable error) {
             return null;
         }
     }
 
-    private static java.lang.reflect.Field findItems(Object adapter, Object shownVideo, int index) throws IllegalAccessException {
-        for (Class<?> type = adapter.getClass(); type != null && type != Object.class; type = type.getSuperclass()) {
-            for (java.lang.reflect.Field field : type.getDeclaredFields()) {
-                if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || !java.util.List.class.isAssignableFrom(field.getType())) continue;
-                field.setAccessible(true);
-                Object list = field.get(adapter);
-                if (list instanceof java.util.List && index < ((java.util.List<?>) list).size()
-                        && ((java.util.List<?>) list).get(index) == shownVideo) {
-                    return field;
+    /** The video itself, or the one a wrapper holds. */
+    private static Object video(Object value, Class<?> type) {
+        if (value == null || value.getClass() == type) return value;
+        for (String getter : new String[]{"getAweme", "getData", "getItem"}) {
+            Object inner = Reflect.call(value, getter);
+            if (inner != null && inner.getClass() == type) return inner;
+        }
+        return null;
+    }
+
+    private static boolean same(Object value, Object shownVideo, String shownId) {
+        if (value == shownVideo) return true;
+        return value != null && value.getClass() == shownVideo.getClass() && shownId != null
+                && shownId.equals(string(Reflect.get(value, "aid")));
+    }
+
+    private static void find(Object adapter, Object feedPanel, Object shownVideo, String shownId, int index) {
+        for (Object owner : new Object[]{adapter, feedPanel}) {
+            for (Class<?> type = owner.getClass(); type != null && type != Object.class; type = type.getSuperclass()) {
+                for (java.lang.reflect.Field field : type.getDeclaredFields()) {
+                    if (java.lang.reflect.Modifier.isStatic(field.getModifiers()) || !java.util.List.class.isAssignableFrom(field.getType())) continue;
+                    try {
+                        field.setAccessible(true);
+                        Object list = field.get(owner);
+                        if (list instanceof java.util.List && index < ((java.util.List<?>) list).size()
+                                && same(((java.util.List<?>) list).get(index), shownVideo, shownId)) {
+                            items = field;
+                            itemsOnPanel = owner == feedPanel;
+                            RuntimeLog.log("auto-scroll lookahead: " + type.getSimpleName() + "." + field.getName());
+                            return;
+                        }
+                    } catch (Throwable ignored) {
+                        // The next field.
+                    }
                 }
             }
         }
-        return null;
+        for (Class<?> type = adapter.getClass(); type != null && type != Object.class; type = type.getSuperclass()) {
+            for (Method method : Reflect.methods(type)) {
+                Class<?>[] parameters = method.getParameterTypes();
+                if (parameters.length != 1 || parameters[0] != int.class || method.getReturnType().isPrimitive()
+                        || java.lang.reflect.Modifier.isStatic(method.getModifiers())) continue;
+                String name = method.getName();
+                if (name.startsWith("instantiate") || name.startsWith("destroy") || name.startsWith("get") && name.contains("Title")) continue;
+                try {
+                    method.setAccessible(true);
+                    if (same(video(method.invoke(adapter, index), shownVideo.getClass()), shownVideo, shownId)) {
+                        itemAt = method;
+                        RuntimeLog.log("auto-scroll lookahead: " + type.getSimpleName() + "." + name + "(int)");
+                        return;
+                    }
+                } catch (Throwable ignored) {
+                    // The next method.
+                }
+            }
+        }
+        if (!lookupNoted) {
+            lookupNoted = true;
+            RuntimeLog.log("auto-scroll lookahead: not found in " + adapter.getClass().getName());
+        }
     }
 
     /** Asks the feed for more videos, where it offers a way to; true if something was asked. */

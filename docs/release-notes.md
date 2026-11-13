@@ -1,4 +1,14 @@
-## 4.6.1 (fork)
+## 4.6.2 (fork)
+
+- The next two videos are downloaded to the phone while one plays, and then play from the file: no waiting at each move.
+- A video that streams slowly plays from its download as soon as that is done.
+- Fixed: the next videos were not found in TikTok's list, and the Wi-Fi lock failed to start.
+
+- Bir video çalarken sıradaki iki video telefona indiriliyor ve dosyadan çalıyor: her geçişte bekleme yok.
+- Yavaş yüklenen video, indirmesi biter bitmez dosyadan çalıyor.
+- Düzeltildi: sıradaki videolar TikTok'un listesinde bulunamıyordu ve Wi‑Fi kilidi başlamıyordu.
+
+## 4.6.1
 
 Background play with the screen off, more reliable:
 - The next video is loaded while the current one plays, so it starts at once.

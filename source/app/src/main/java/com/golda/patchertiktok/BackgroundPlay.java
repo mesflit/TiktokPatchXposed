@@ -67,11 +67,6 @@ final class BackgroundPlay {
     private static long seenAt;
     private static long movedAt;
 
-    /** The next video, loaded while the current one plays, so it starts at once. */
-    private static MediaPlayer nextPlayer;
-    private static String nextId;
-    private static boolean nextReady;
-    private static List<String> nextAddresses;
     /** The feed had no next video: the current one loops while more are asked for. */
     private static boolean waitingMore;
     private static long waitingSince;
@@ -163,18 +158,6 @@ final class BackgroundPlay {
         if (power != null && app.checkSelfPermission(android.Manifest.permission.WAKE_LOCK) == PackageManager.PERMISSION_GRANTED) {
             lock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TiktokPatchXposed:background");
             lock.setReferenceCounted(false);
-            try {
-                android.net.wifi.WifiManager manager = (android.net.wifi.WifiManager) app.getApplicationContext()
-                        .getSystemService(Context.WIFI_SERVICE);
-                if (manager != null) {
-                    wifi = manager.createWifiLock(Build.VERSION.SDK_INT >= 29
-                            ? android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_LATENCY
-                            : android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "TiktokPatchXposed:background");
-                    wifi.setReferenceCounted(false);
-                }
-            } catch (Throwable error) {
-                Safe.log("background play wifi lock", error);
-            }
         }
         MediaControls.attach(app, new MediaControls.Player() {
             @Override public void play() { userPlay(); }
@@ -313,7 +296,7 @@ final class BackgroundPlay {
         generation++;
         waitingMore = false;
         releasePlayer();
-        dropNext();
+        BackgroundCache.clear();
         aweme = null;
         playingId = null;
         MAIN.removeCallbacks(WATCH);
@@ -368,53 +351,47 @@ final class BackgroundPlay {
         addresses = found;
         addressIndex = 0;
         startAt = position;
-        if (nextPlayer != null && playingId != null && playingId.equals(nextId)) {
-            // Loaded already while the last video played.
-            releasePlayer();
-            generation++;
-            player = nextPlayer;
-            prepared = nextReady;
-            openedAt = SystemClock.elapsedRealtime();
-            if (nextAddresses != null) addresses = nextAddresses;
-            nextPlayer = null;
-            nextId = null;
-            trace("starting " + playingId + (prepared ? " (loaded ahead)" : " (still loading ahead)"));
-            if (prepared) onPrepared(player);
-            else publish();
+        java.io.File file = BackgroundCache.file(playingId);
+        if (file != null) {
+            // Downloaded already while the last video played: no network needed now.
+            fromFile = true;
+            openSource(file.getPath(), "the downloaded file");
             return;
         }
-        dropNext();
+        fromFile = false;
+        // Streams now, and downloads alongside: whichever is first plays.
+        BackgroundCache.fetch(app, playingId, addresses, BackgroundPlay::downloaded);
         open();
     }
 
-    /** Loads the feed's next video into a second player, so the move to it is instant and needs no network then. */
+    private static boolean fromFile;
+
+    /** A download finished. If it is the video still waiting to start, it plays from the file now. */
+    private static void downloaded(String id) {
+        if (!away || id == null || !id.equals(playingId) || fromFile || prepared) return;
+        java.io.File file = BackgroundCache.file(id);
+        if (file == null) return;
+        fromFile = true;
+        trace("streaming was slower; playing " + id + " from the file");
+        openSource(file.getPath(), "the downloaded file");
+    }
+
+    /** Downloads the feed's next two videos while this one plays, so moving on needs no network then. */
     private static void prefetch() {
         Object feedPanel = panel.get();
         if (!away || feedPanel == null || !AutoScroll.movesOn(feedPanel)) return;
-        Object upcoming = AutoScroll.upcoming(feedPanel, 1);
-        String id = id(upcoming);
-        if (upcoming == null || id == null || id.equals(nextId)) return;
-        List<String> found = videoAddresses(upcoming);
-        if (found.isEmpty()) return;
-        dropNext();
-        nextId = id;
-        nextAddresses = found;
-        nextReady = false;
-        nextPlayer = create(found.get(0));
-        if (nextPlayer == null) nextId = null;
-        else trace("loading ahead " + id);
-    }
-
-    private static void dropNext() {
-        MediaPlayer old = nextPlayer;
-        nextPlayer = null;
-        nextId = null;
-        nextReady = false;
-        if (old != null) {
-            try {
-                old.reset();
-                old.release();
-            } catch (Throwable ignored) { }
+        for (int ahead = 1; ahead <= 2; ahead++) {
+            Object upcoming = AutoScroll.upcoming(feedPanel, ahead);
+            String id = id(upcoming);
+            if (upcoming == null) {
+                if (ahead == 1) trace("next video not known yet (" + AutoScroll.remaining(feedPanel) + " left)");
+                return;
+            }
+            if (BackgroundCache.known(id)) continue;
+            List<String> found = videoAddresses(upcoming);
+            if (found.isEmpty()) continue;
+            trace("downloading ahead " + id);
+            BackgroundCache.fetch(app, id, found, ignored -> { });
         }
     }
 
@@ -437,16 +414,20 @@ final class BackgroundPlay {
     }
 
     private static void open() {
+        openSource(addresses.get(addressIndex), "address " + (addressIndex + 1) + " of " + addresses.size());
+    }
+
+    private static void openSource(String source, String what) {
         releasePlayer();
         generation++;
         prepared = false;
         openedAt = SystemClock.elapsedRealtime();
-        player = create(addresses.get(addressIndex));
+        player = create(source);
         if (player == null) {
             failed("could not open");
             return;
         }
-        trace("opening " + playingId + " (address " + (addressIndex + 1) + " of " + addresses.size() + ")");
+        trace("opening " + playingId + " (" + what + ")");
         publish();
     }
 
@@ -465,13 +446,10 @@ final class BackgroundPlay {
             }
             Map<String, String> headers = new HashMap<>();
             headers.put("User-Agent", "Mozilla/5.0");
-            created.setDataSource(app, Uri.parse(url), headers);
+            if (url.startsWith("/")) created.setDataSource(url);
+            else created.setDataSource(app, Uri.parse(url), headers);
             created.setOnPreparedListener(ready -> guarded(() -> {
                 if (ready == player) onPrepared(ready);
-                else if (ready == nextPlayer) {
-                    nextReady = true;
-                    trace("loaded ahead " + nextId);
-                }
             }));
             created.setOnCompletionListener(done -> guarded(() -> {
                 if (done == player) ended();
@@ -482,10 +460,6 @@ final class BackgroundPlay {
             created.setOnErrorListener((failed, what, extra) -> {
                 guarded(() -> {
                     if (failed == player) failed("player error " + what + "/" + extra);
-                    else if (failed == nextPlayer) {
-                        trace("loading ahead failed " + what + "/" + extra);
-                        dropNext();
-                    }
                 });
                 return true;
             });
@@ -546,6 +520,17 @@ final class BackgroundPlay {
     /** The current address does not play: its next address, then the next video, then give up. */
     private static void failed(String why) {
         trace(why);
+        if (fromFile) {
+            fromFile = false;
+            open();
+            return;
+        }
+        // Still downloading: the file may yet arrive; give it a little before moving on.
+        if (BackgroundCache.known(playingId) && BackgroundCache.file(playingId) == null && addressIndex + 1 >= addresses.size()) {
+            releasePlayer();
+            openedAt = SystemClock.elapsedRealtime();
+            return;
+        }
         if (addressIndex + 1 < addresses.size()) {
             addressIndex++;
             open();
@@ -738,8 +723,15 @@ final class BackgroundPlay {
                 // Asks again now and then; the network may have been asleep the last time.
                 askedAt = SystemClock.elapsedRealtime();
                 AutoScroll.loadMore(panel.get());
-            } else if (player != null && !prepared && SystemClock.elapsedRealtime() - openedAt > 12_000L) {
-                failed("no answer from the address after 12 s");
+            } else if (player != null && !prepared && !fromFile && SystemClock.elapsedRealtime() - openedAt > 8_000L) {
+                failed("no answer from the address after 8 s");
+            } else if (player == null && playingId != null && !waitingMore && !userPaused
+                    && SystemClock.elapsedRealtime() - openedAt > 25_000L) {
+                // Neither streaming nor the download got anywhere.
+                openedAt = SystemClock.elapsedRealtime();
+                Object feedPanel = panel.get();
+                if (feedPanel != null && AutoScroll.movesOn(feedPanel)) advance();
+                else idle();
             } else if (photoLimit > 0 && playingNow() && position() >= photoLimit) {
                 Object feedPanel = panel.get();
                 if (feedPanel != null && AutoScroll.movesOn(feedPanel)) advance();
@@ -839,7 +831,24 @@ final class BackgroundPlay {
         return mode == AudioManager.MODE_IN_CALL || mode == AudioManager.MODE_IN_COMMUNICATION || mode == AudioManager.MODE_RINGTONE;
     }
 
+    /** Made on first use: when the module attaches, TikTok's application is not ready for it yet. */
+    private static void makeWifiLock() {
+        if (wifi != null || app == null) return;
+        try {
+            Context context = app.getApplicationContext() != null ? app.getApplicationContext() : app;
+            android.net.wifi.WifiManager manager = (android.net.wifi.WifiManager) context.getSystemService(Context.WIFI_SERVICE);
+            if (manager == null) return;
+            wifi = manager.createWifiLock(Build.VERSION.SDK_INT >= 29
+                    ? android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+                    : android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "TiktokPatchXposed:background");
+            wifi.setReferenceCounted(false);
+        } catch (Throwable error) {
+            Safe.log("background play wifi lock", error);
+        }
+    }
+
     private static void holdLock() {
+        makeWifiLock();
         try {
             if (lock != null) lock.acquire(LOCK_MS);
             if (wifi != null && !wifi.isHeld()) wifi.acquire();
