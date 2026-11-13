@@ -71,6 +71,8 @@ final class BackgroundPlay {
     private static boolean waitingMore;
     private static long waitingSince;
     private static long askedAt;
+    /** Paused because the list ended; more videos arriving continue by themselves. */
+    private static boolean endPaused;
     private static int ticks;
 
     /** The module's own player and what it plays. */
@@ -236,6 +238,8 @@ final class BackgroundPlay {
         userPaused = false;
         interrupted = false;
         waitingMore = false;
+        endPaused = false;
+        MediaControls.notice(null);
         failures = 0;
         skips = 0;
         pendingId = null;
@@ -349,7 +353,7 @@ final class BackgroundPlay {
         }
         aweme = shown;
         playingId = id(shown);
-        addresses = found;
+        addresses = BackgroundCache.order(found);
         addressIndex = 0;
         startAt = position;
         java.io.File file = BackgroundCache.file(playingId);
@@ -386,7 +390,7 @@ final class BackgroundPlay {
             String id = id(upcoming);
             if (upcoming == null) return;
             if (BackgroundCache.known(id)) continue;
-            List<String> found = videoAddresses(upcoming);
+            List<String> found = BackgroundCache.order(videoAddresses(upcoming));
             if (found.isEmpty()) continue;
             trace("downloading ahead " + id);
             BackgroundCache.fetch(app, id, found, ignored -> { });
@@ -412,6 +416,7 @@ final class BackgroundPlay {
     }
 
     private static void open() {
+        while (addressIndex + 1 < addresses.size() && BackgroundCache.unreachable(addresses.get(addressIndex))) addressIndex++;
         openSource(addresses.get(addressIndex), "address " + (addressIndex + 1) + " of " + addresses.size());
     }
 
@@ -653,6 +658,7 @@ final class BackgroundPlay {
 
     private static void userPause() {
         if (!away) return;
+        endPaused = false;
         userPaused = true;
         if (playingNow()) player.pause();
         releaseLock();
@@ -661,6 +667,8 @@ final class BackgroundPlay {
 
     private static void userPlay() {
         if (!away) return;
+        endPaused = false;
+        MediaControls.notice(null);
         userPaused = false;
         interrupted = false;
         holdLock();
@@ -675,6 +683,8 @@ final class BackgroundPlay {
 
     private static void userNext() {
         if (!away) return;
+        endPaused = false;
+        MediaControls.notice(null);
         userPaused = false;
         interrupted = false;
         holdLock();
@@ -718,8 +728,25 @@ final class BackgroundPlay {
             } else if (waitingMore && panel.get() != null && AutoScroll.remaining(panel.get()) > 0) {
                 trace("more videos arrived after " + (SystemClock.elapsedRealtime() - waitingSince) + " ms");
                 waitingMore = false;
-                prefetch();
+                MediaControls.notice(null);
+                if (endPaused) {
+                    // Paused only for the end of the list: go on with the new videos.
+                    endPaused = false;
+                    userPaused = false;
+                    holdLock();
+                    advance();
+                } else {
+                    prefetch();
+                }
                 // Moves on when the looping video ends.
+            } else if (waitingMore && !endPaused && SystemClock.elapsedRealtime() - waitingSince > 45_000L) {
+                // The list is over (a profile, a search): rather than one video over and over, a pause.
+                endPaused = true;
+                trace("no more videos after 45 s: paused at the end of the list");
+                if (playingNow()) player.pause();
+                userPaused = true;
+                MediaControls.notice(I18n.get(I18n.S.MEDIA_END));
+                publish();
             } else if (waitingMore && SystemClock.elapsedRealtime() - askedAt > 20_000L && panel.get() != null) {
                 // Asks again now and then; the network may have been asleep the last time.
                 askedAt = SystemClock.elapsedRealtime();

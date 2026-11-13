@@ -1,4 +1,12 @@
-## 4.6.3 (fork)
+## 4.6.4 (fork)
+
+- Video servers the phone cannot find are tried last, so a video no longer hangs for 20+ seconds on them.
+- At the end of a list (a profile, a search) the last video no longer repeats forever: after 45 s without new videos it pauses and the notification says the list is over. If new videos arrive, it goes on by itself.
+
+- Telefonun bulamadığı video sunucuları en sona alınıyor; video artık onlarda 20+ saniye takılmıyor.
+- Bir listenin sonunda (profil, arama) son video sonsuza kadar tekrarlamıyor: 45 sn yeni video gelmezse duraklıyor ve bildirimde listenin bittiği yazıyor. Yeni video gelirse kendiliğinden devam ediyor.
+
+## 4.6.3
 
 - A download that fails with the screen off (the network still waking up) is tried again.
 - Videos that arrive at the end of the feed are downloaded ahead too, and failed downloads are retried every few seconds.

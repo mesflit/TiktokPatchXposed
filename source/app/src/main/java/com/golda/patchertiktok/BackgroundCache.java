@@ -42,6 +42,39 @@ final class BackgroundCache {
     private static final Map<String, File> READY = new LinkedHashMap<>();
     private static final Set<String> LOADING = new HashSet<>();
     private static volatile int session;
+    /** Servers the phone's own name lookup cannot find; TikTok finds them its own way. Tried last. */
+    private static final Set<String> BAD_HOSTS = java.util.Collections.synchronizedSet(new HashSet<>());
+    private static final Set<String> GOOD_HOSTS = java.util.Collections.synchronizedSet(new HashSet<>());
+
+    /** {@code urls} with servers known to work first and servers known not to be found last. */
+    static List<String> order(List<String> urls) {
+        List<String> good = new ArrayList<>();
+        List<String> unknown = new ArrayList<>();
+        List<String> bad = new ArrayList<>();
+        for (String url : urls) {
+            String host = host(url);
+            if (GOOD_HOSTS.contains(host)) good.add(url);
+            else if (BAD_HOSTS.contains(host)) bad.add(url);
+            else unknown.add(url);
+        }
+        good.addAll(unknown);
+        good.addAll(bad);
+        return good;
+    }
+
+    /** Whether the phone could not find the server of {@code url}. */
+    static boolean unreachable(String url) {
+        return BAD_HOSTS.contains(host(url));
+    }
+
+    private static String host(String url) {
+        try {
+            String host = new URL(url).getHost();
+            return host == null ? "" : host;
+        } catch (Throwable error) {
+            return "";
+        }
+    }
 
     private BackgroundCache() { }
 
@@ -63,7 +96,7 @@ final class BackgroundCache {
             LOADING.add(id);
         }
         int mine = session;
-        List<String> copy = new ArrayList<>(urls);
+        List<String> copy = order(urls);
         File folder = new File(context.getCacheDir(), "tiktokpatchxposed-background");
         WORKERS.execute(() -> {
             File done = null;
@@ -77,9 +110,16 @@ final class BackgroundCache {
                     if (round > 0) Thread.sleep(2_000L * round);
                     for (String url : copy) {
                     if (mine != session) return;
+                    String host = host(url);
+                    // A server the phone cannot find is skipped; others of the list are tried.
+                    if (round == 0 && BAD_HOSTS.contains(host) && copy.size() > 1) continue;
                     File part = new File(folder, safe(id) + ".part");
                     try {
                         why = download(url, part);
+                        if (why == null) GOOD_HOSTS.add(host);
+                    } catch (java.net.UnknownHostException error) {
+                        BAD_HOSTS.add(host);
+                        why = "server not found: " + host;
                         if (why == null) {
                             File target = new File(folder, safe(id) + ".mp4");
                             if (target.exists()) target.delete();

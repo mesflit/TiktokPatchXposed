@@ -59,6 +59,12 @@ final class MediaControls {
     private static boolean playing;
     private static String title = "TikTok";
     private static String author = "";
+    /** A line shown instead of the author, such as the end of the list; null for none. */
+    private static String notice;
+
+    static void notice(String text) {
+        notice = text;
+    }
 
     private MediaControls() { }
 
@@ -86,7 +92,7 @@ final class MediaControls {
         if (session != null) {
             MediaMetadata.Builder metadata = new MediaMetadata.Builder()
                     .putString(MediaMetadata.METADATA_KEY_TITLE, title)
-                    .putString(MediaMetadata.METADATA_KEY_ARTIST, author);
+                    .putString(MediaMetadata.METADATA_KEY_ARTIST, notice != null ? notice : author);
             if (duration > 0) metadata.putLong(MediaMetadata.METADATA_KEY_DURATION, duration);
             session.setMetadata(metadata.build());
             long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE | PlaybackState.ACTION_PLAY_PAUSE
@@ -133,7 +139,7 @@ final class MediaControls {
             Notification.Builder builder = new Notification.Builder(app, CHANNEL)
                     .setSmallIcon(android.R.drawable.ic_media_play)
                     .setContentTitle(title)
-                    .setContentText(author)
+                    .setContentText(notice != null ? notice : author)
                     .setOnlyAlertOnce(true)
                     .setShowWhen(false)
                     .setOngoing(playing)
