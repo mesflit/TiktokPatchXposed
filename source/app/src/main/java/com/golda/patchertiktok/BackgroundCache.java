@@ -71,7 +71,11 @@ final class BackgroundCache {
             long started = System.currentTimeMillis();
             try {
                 if (!folder.isDirectory() && !folder.mkdirs()) throw new IllegalStateException("no cache folder");
-                for (String url : copy) {
+                // With the screen off the network wakes slowly: a failed round is tried again, twice.
+                rounds:
+                for (int round = 0; round < 3; round++) {
+                    if (round > 0) Thread.sleep(2_000L * round);
+                    for (String url : copy) {
                     if (mine != session) return;
                     File part = new File(folder, safe(id) + ".part");
                     try {
@@ -81,7 +85,7 @@ final class BackgroundCache {
                             if (target.exists()) target.delete();
                             if (part.renameTo(target)) {
                                 done = target;
-                                break;
+                                break rounds;
                             }
                             why = "could not keep the file";
                         }
@@ -89,6 +93,7 @@ final class BackgroundCache {
                         why = error.getClass().getSimpleName() + ": " + error.getMessage();
                     }
                     part.delete();
+                    }
                 }
             } catch (Throwable error) {
                 why = String.valueOf(error);

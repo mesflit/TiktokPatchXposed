@@ -1,4 +1,12 @@
-## 4.6.2 (fork)
+## 4.6.3 (fork)
+
+- A download that fails with the screen off (the network still waking up) is tried again.
+- Videos that arrive at the end of the feed are downloaded ahead too, and failed downloads are retried every few seconds.
+
+- Ekran kapalıyken başarısız olan indirme (ağ henüz uyanmamışken) tekrar deneniyor.
+- Akışın sonuna yeni gelen videolar da önceden indiriliyor; başarısız indirmeler birkaç saniyede bir yeniden deneniyor.
+
+## 4.6.2
 
 - The next two videos are downloaded to the phone while one plays, and then play from the file: no waiting at each move.
 - A video that streams slowly plays from its download as soon as that is done.

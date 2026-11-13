@@ -71,6 +71,7 @@ final class BackgroundPlay {
     private static boolean waitingMore;
     private static long waitingSince;
     private static long askedAt;
+    private static int ticks;
 
     /** The module's own player and what it plays. */
     private static MediaPlayer player;
@@ -383,10 +384,7 @@ final class BackgroundPlay {
         for (int ahead = 1; ahead <= 2; ahead++) {
             Object upcoming = AutoScroll.upcoming(feedPanel, ahead);
             String id = id(upcoming);
-            if (upcoming == null) {
-                if (ahead == 1) trace("next video not known yet (" + AutoScroll.remaining(feedPanel) + " left)");
-                return;
-            }
+            if (upcoming == null) return;
             if (BackgroundCache.known(id)) continue;
             List<String> found = videoAddresses(upcoming);
             if (found.isEmpty()) continue;
@@ -713,11 +711,14 @@ final class BackgroundPlay {
                 endSession();
                 return;
             }
+            // Now and then: the next videos are downloaded, also those whose download failed before.
+            if (++ticks % 8 == 0 && playingNow()) prefetch();
             if (inCall()) {
                 interrupt();
             } else if (waitingMore && panel.get() != null && AutoScroll.remaining(panel.get()) > 0) {
                 trace("more videos arrived after " + (SystemClock.elapsedRealtime() - waitingSince) + " ms");
                 waitingMore = false;
+                prefetch();
                 // Moves on when the looping video ends.
             } else if (waitingMore && SystemClock.elapsedRealtime() - askedAt > 20_000L && panel.get() != null) {
                 // Asks again now and then; the network may have been asleep the last time.
